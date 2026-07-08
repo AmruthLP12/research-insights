@@ -1,0 +1,85 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Login{% endblock %}
+
+{% block content %}
+    <div class="max-w-md mx-auto mt-10">
+        <div class="card bg-base-100 shadow-lg border border-base-300">
+            <div class="card-body">
+
+                <h1 class="card-title text-2xl justify-center mb-4">
+                    Login
+                </h1>
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-error mb-4">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+
+                <form method="post" class="space-y-5">
+                    {% csrf_token %}
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Username</span>
+                        </label>
+
+                        {{ form.username }}
+
+                        {% if form.username.errors %}
+                            <label class="label">
+                                <span class="label-text-alt text-error">
+                                    {{ form.username.errors|striptags }}
+                                </span>
+                            </label>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Password</span>
+                        </label>
+
+                        {{ form.password }}
+
+                        {% if form.password.errors %}
+                            <label class="label">
+                                <span class="label-text-alt text-error">
+                                    {{ form.password.errors|striptags }}
+                                </span>
+                            </label>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex items-center justify-between">
+
+                        <label class="label cursor-pointer gap-2">
+                            {{ form.remember_me }}
+                            <span class="label-text">Remember me</span>
+                        </label>
+
+                        <a
+                            href="{% url 'accounts:password_reset' %}"
+                            class="link link-primary text-sm"
+                        >
+                            Forgot password?
+                        </a>
+
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-full">
+                        Login
+                    </button>
+
+                </form>
+
+                <div class="divider"></div>
+
+                <p class="text-center text-sm text-base-content/70">
+                    Need help? Contact your administrator.
+                </p>
+
+            </div>
+        </div>
+    </div>
+{% endblock %}

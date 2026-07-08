@@ -1,0 +1,212 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+
+    <div class="space-y-8">
+
+    <!-- Header -->
+        <div>
+            <h1 class="text-3xl font-bold">
+                Document Types
+            </h1>
+
+            <p class="text-base-content/60 mt-1">
+                Publication distribution across document categories.
+            </p>
+        </div>
+
+    <!-- KPI Cards -->
+        <div class="stats shadow border border-base-300 w-full">
+
+            <div class="stat">
+                <div class="stat-title">Document Types</div>
+                <div class="stat-value text-primary">
+                    {{ document_type_count }}
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Publications</div>
+                <div class="stat-value text-secondary">
+                    {{ document_total_publications }}
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Average Impact</div>
+                <div class="stat-value text-accent">
+                    {{ document_average_impact|floatformat:2 }}
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Highest Impact</div>
+                <div class="stat-value text-success">
+                    {{ document_highest_impact|floatformat:2 }}
+                </div>
+            </div>
+
+        </div>
+
+    <!-- Charts -->
+        <div class="grid lg:grid-cols-2 gap-6">
+
+            <div class="card bg-base-100 border border-base-300 shadow">
+
+                <div class="card-body">
+
+                    <h2 class="card-title">
+                        Publications by Document Type
+                    </h2>
+
+                    <canvas id="documentBarChart"></canvas>
+
+                </div>
+
+            </div>
+
+            <div class="card bg-base-100 border border-base-300 shadow">
+
+                <div class="card-body">
+
+                    <h2 class="card-title">
+                        Distribution
+                    </h2>
+
+                    <canvas id="documentPieChart"></canvas>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    <!-- Table -->
+        <div class="card bg-base-100 shadow border border-base-300">
+
+            <div class="card-body">
+
+                <h2 class="card-title">
+                    Document Type Summary
+                </h2>
+
+                <div class="overflow-x-auto">
+
+                    <table class="table table-zebra">
+
+                        <thead>
+
+                            <tr>
+                                <th>#</th>
+                                <th>Document Type</th>
+                                <th class="text-center">Publications</th>
+                                <th class="text-center">Total IF</th>
+                                <th class="text-center">Average IF</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            {% for row in document_types %}
+
+                                <tr>
+
+                                    <td>{{ forloop.counter }}</td>
+
+                                    <td>{{ row.document_type }}</td>
+
+                                    <td class="text-center">
+                                        <span class="badge badge-primary badge-outline">
+                                            {{ row.total_publications }}
+                                        </span>
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ row.total_impact_factor|default:0|floatformat:2 }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        <span class="badge badge-success">
+                                            {{ row.average_impact_factor|default:0|floatformat:2 }}
+                                        </span>
+                                    </td>
+
+                                </tr>
+
+                            {% empty %}
+
+                                <tr>
+                                    <td colspan="5" class="text-center py-8 text-base-content/60">
+                                        No document type data available.
+                                    </td>
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {{ document_types_data|json_script:"document-types-data" }}
+
+    <script>
+
+        const documentData = JSON.parse(
+            document.getElementById("document-types-data").textContent
+        );
+
+// Top document types
+        const labels = documentData.map(item => item.document_type);
+        const totals = documentData.map(item => item.total_publications);
+        const avgImpact = documentData.map(item => item.average_impact_factor);
+
+// Publications Chart
+        new Chart(document.getElementById("documentBarChart"), {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    label: "Publications",
+                    data: totals,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+// Distribution Chart
+        new Chart(document.getElementById("documentPieChart"), {
+            type: "doughnut",
+            data: {
+                labels,
+                datasets: [{
+                    data: totals,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: "bottom"
+                    }
+                }
+            }
+        });
+
+    </script>
+
+{% endblock %}

@@ -1,0 +1,45 @@
+<div class="card bg-base-100 shadow border border-base-300">
+
+    <div class="card-body">
+
+        <div class="flex justify-between items-center">
+
+            <div>
+
+                <h2 class="card-title">
+                    {{ title }}
+                </h2>
+
+                <p class="text-sm text-base-content/60">
+
+                    Showing
+
+                    {{ page_obj.start_index }}
+
+                    -
+
+                    {{ page_obj.end_index }}
+
+                    of
+
+                    {{ page_obj.paginator.count }}
+
+                    {{ object_name }}
+
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="overflow-x-auto mt-6">
+
+            {{ table_content }}
+
+        </div>
+
+        {% include "components/pagination.html" with object_name=object_name %}
+
+    </div>
+
+</div>

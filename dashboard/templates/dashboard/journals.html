@@ -1,0 +1,130 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Journals{% endblock %}
+
+{% block content %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
+
+    <!-- ================= MAIN ================= -->
+    <main class="flex-1 p-8">
+
+        <!-- HEADER -->
+        <div class="flex justify-between items-center mb-12">
+            <h1 class="text-3xl font-bold" id="dashboard-title">
+                Journal-wise Publications
+            </h1>
+
+            <!-- Dark/Light Mode Toggle -->
+            <button id="theme-toggle" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-200 transition">
+                🌙
+            </button>
+        </div>
+
+        <!-- ================= FILTER BAR ================= -->
+        <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
+            <div class="flex flex-col md:flex-row gap-4 md:items-center">
+
+                <input type="date" id="from"
+                    class="border rounded-lg px-4 py-2">
+
+                <input type="date" id="to"
+                    class="border rounded-lg px-4 py-2">
+
+                <input type="text" id="pub-search"
+                    placeholder="Search publications..."
+                    class="border rounded-lg px-4 py-2 w-full md:w-64">
+
+                <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
+                    Apply
+                </button>
+
+            </div>
+                
+        </div>
+        <!-- ================= JOURNALS TABLE ================= -->
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+            <h2 class="text-2xl font-bold mb-6 dark:text-gray-200">Journal List</h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead class="bg-gray-100 dark:bg-gray-700">
+                        <tr>
+                            <th class="p-3">Journal</th>
+                            <th class="p-3 text-center">Publications</th>
+                            <th class="p-3 text-center">Impact Factor</th>
+                            <th class="p-3 text-center">Total Impact Factor</th>
+                            <th class="p-3 text-center">Average Impact Factor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for j in journals %}
+                        <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900">
+                            <td class="p-3">{{ j.journal__name }}</td>
+                            <td class="p-3 text-center">{{ j.total }}</td>
+                            <td class="p-3 text-center">{{ j.journal__impact_factor|default:"—" }}</td>
+                            <td class="p-3 text-center">{{ j.total_impact_factor|floatformat:2 }}</td>
+                            <td class="p-3 text-center">{{ j.avg_if }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-gray-500 dark:text-gray-400">
+                                No journal data available
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- ================= COUNTER ANIMATION ================= -->
+<script>
+function animateCounters() {
+    document.querySelectorAll('.counter').forEach(counter => {
+        const target = +counter.dataset.value;
+        let current = 0;
+        const increment = target / 50;
+        const update = () => {
+            current += increment;
+            if(current < target){
+                counter.innerText = Math.floor(current);
+                requestAnimationFrame(update);
+            } else {
+                counter.innerText = target;
+            }
+        };
+        update();
+    });
+}
+animateCounters();
+</script>
+
+<!-- ================= DARK/LIGHT MODE ================= -->
+<script>
+const toggle = document.getElementById('theme-toggle');
+if(localStorage.getItem('theme') === 'dark') {
+    document.documentElement.classList.add('dark');
+    toggle.textContent = '☀️';
+} else {
+    document.documentElement.classList.remove('dark');
+    toggle.textContent = '🌙';
+}
+
+toggle.addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    if(document.documentElement.classList.contains('dark')) {
+        localStorage.setItem('theme', 'dark');
+        toggle.textContent = '☀️';
+    } else {
+        localStorage.setItem('theme', 'light');
+        toggle.textContent = '🌙';
+    }
+});
+</script>
+
+{% endblock %}
