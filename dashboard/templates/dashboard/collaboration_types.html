@@ -1,0 +1,172 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+
+    <div class="space-y-8">
+
+    <!-- Header -->
+        <div>
+            <h1 class="text-3xl font-bold">
+                Collaboration Types
+            </h1>
+
+            <p class="text-base-content/60 mt-1">
+                Publication distribution by collaboration category.
+            </p>
+        </div>
+
+    <!-- Stats -->
+
+        <div class="stats stats-vertical lg:stats-horizontal shadow border border-base-300 w-full bg-base-100">
+
+            <div class="stat">
+                <div class="stat-title">Types</div>
+                <div class="stat-value text-primary">
+                    {{ collaboration_types_count }}
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Total Publications</div>
+                <div class="stat-value text-secondary">
+                    {{ collaboration_total_publications }}
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Total Impact</div>
+                <div class="stat-value text-accent">
+                    {{ collaboration_total_impact|floatformat:2 }}
+                </div>
+            </div>
+
+            <div class="stat">
+                <div class="stat-title">Average Impact</div>
+                <div class="stat-value text-info">
+                    {{ collaboration_average_impact|floatformat:2 }}
+                </div>
+            </div>
+
+        </div>
+
+    <!-- Chart -->
+
+        <div class="card bg-base-100 border border-base-300 shadow">
+
+            <div class="card-body">
+
+                <h2 class="card-title">
+                    Publications by Collaboration Type
+                </h2>
+
+                <canvas id="collaborationChart" height="120"></canvas>
+
+            </div>
+
+        </div>
+
+    <!-- Table -->
+
+        <div class="card bg-base-100 border border-base-300 shadow">
+
+            <div class="card-body">
+
+                <h2 class="card-title">
+                    Collaboration Type Statistics
+                </h2>
+
+                <div class="overflow-x-auto">
+
+                    <table class="table table-zebra">
+
+                        <thead>
+                            <tr>
+                                <th>Collaboration Type</th>
+                                <th class="text-center">Publications</th>
+                                <th class="text-center">Total Impact</th>
+                                <th class="text-center">Average Impact</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+
+                            {% for row in collaboration_types %}
+
+                                <tr>
+
+                                    <td>
+                                        <div class="badge badge-outline">
+                                            {{ row.collaboration_type }}
+                                        </div>
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ row.total }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ row.total_impact_factor|default:0|floatformat:2 }}
+                                    </td>
+
+                                    <td class="text-center">
+                                        {{ row.avg_impact_factor|default:0|floatformat:2 }}
+                                    </td>
+
+                                </tr>
+
+                            {% empty %}
+
+                                <tr>
+                                    <td colspan="4" class="text-center py-8 text-base-content/60">
+                                        No collaboration data available.
+                                    </td>
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {{ collaboration_types|json_script:"collaboration-data" }}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+
+            const data = JSON.parse(
+                document.getElementById("collaboration-data").textContent
+            );
+
+            new Chart(document.getElementById("collaborationChart"), {
+
+                type: "doughnut",
+
+                data: {
+                    labels: data.map(i => i.collaboration_type),
+                    datasets: [{
+                        data: data.map(i => i.total)
+                    }]
+                },
+
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: "bottom"
+                        }
+                    }
+                }
+
+            });
+
+        });
+    </script>
+
+{% endblock %}

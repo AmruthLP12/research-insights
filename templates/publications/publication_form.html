@@ -1,0 +1,13 @@
+<h2>Add Publication</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+
+    <h3>Authors</h3>
+    {{ formset.management_form }}
+    {% for form in formset %}
+        {{ form.as_p }}
+    {% endfor %}
+
+    <button type="submit">Submit</button>
+</form>

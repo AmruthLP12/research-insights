@@ -1,0 +1,76 @@
+<div class="card bg-base-100 border border-base-300 shadow">
+
+    <div class="card-body">
+
+        {% if breadcrumbs %}
+            <div class="breadcrumbs text-sm mb-3">
+                <ul>
+                    {% for crumb in breadcrumbs %}
+                        <li>
+                            {% if crumb.url and not forloop.last %}
+                                <a
+                                    href="{{ crumb.url }}"
+                                    class="text-base-content/60 hover:text-info transition-colors"
+                                >
+                                    {{ crumb.label }}
+                                </a>
+                            {% else %}
+                                <span class="font-medium">
+                                    {{ crumb.label }}
+                                </span>
+                            {% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+
+            <div class="flex items-start gap-4">
+
+                {% if icon %}
+                    <div class="flex h-14 w-14 items-center justify-center rounded-xl bg-info/10 border border-info/20 shrink-0">
+
+                        <span class="text-2xl">
+
+                            {{ icon }}
+
+                        </span>
+
+                    </div>
+                {% endif %}
+
+                <div>
+
+                    <h1 class="text-3xl font-bold tracking-tight">
+
+                        {{ title }}
+
+                    </h1>
+
+                    {% if subtitle %}
+                        <p class="mt-2 text-base-content/60 max-w-3xl">
+
+                            {{ subtitle }}
+
+                        </p>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+            {% if header_actions_template %}
+                <div class="flex flex-wrap gap-2">
+
+                    {% include header_actions_template %}
+
+                </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>

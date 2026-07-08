@@ -1,0 +1,9 @@
+.env
+media/**
+staticfiles/**
+venv/**
+venv/**
+.vscode/**
+theme/static_src/node_modules/**
+db.sqlite3
+Research Insights

@@ -1,0 +1,100 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Upload Web of Science File{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto py-10">
+
+  <!-- ================= HEADER ================= -->
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-gray-800">
+      Upload Web of Science File
+    </h1>
+    <p class="text-gray-600 mt-2">
+      Upload a <strong>tab-delimited (.txt)</strong> file downloaded from
+      <span class="font-semibold">Web of Science</span>.
+    </p>
+  </div>
+
+  <!-- ================= UPLOAD CARD ================= -->
+  <div class="bg-white shadow rounded-lg p-6">
+
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      class="space-y-6"
+    >
+      {% csrf_token %}
+
+      <!-- File input -->
+      <div>
+        <label
+          for="wos_file"
+          class="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Web of Science Export File
+        </label>
+
+        <input
+          type="file"
+          name="wos_file"
+          id="wos_file"
+          accept=".txt"
+          required
+          class="block w-full border border-gray-300 rounded-md px-3 py-2
+                 focus:outline-none focus:ring-2 focus:ring-[#0A4DA3]"
+        >
+
+        <p class="text-sm text-gray-500 mt-2">
+          Accepted format: <code>.txt</code> (Tab-delimited)
+        </p>
+      </div>
+
+      <!-- Instructions -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
+        <p class="font-semibold mb-1">How to export from Web of Science:</p>
+        <ol class="list-decimal ml-5 space-y-1">
+          <li>Select records in Web of Science</li>
+          <li>Click <strong>Export</strong></li>
+          <li>Choose <strong>Tab-delimited (Win)</strong></li>
+          <li>Select <strong>Full Record</strong></li>
+          <li>Download and upload the file here</li>
+        </ol>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3
+                 rounded-lg font-semibold"
+        >
+          Upload & Review
+        </button>
+      </div>
+
+      <!-- Success message -->
+      {% if success %}
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-900">
+        <p class="font-semibold mb-1">Success!</p>
+        <p class="mb-2">
+          Your file has been uploaded successfully.
+        </p>
+        <p class="mb-2">
+          Please review the data and click <strong>Submit</strong> to save it.
+        </p>
+      </div>
+      {% endif %} {% if error %}
+      <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-900">
+        <p class="font-semibold mb-1">Error!</p>
+        <p class="mb-2">
+          There was an error uploading your file.
+        </p>
+        <p class="mb-2">
+          Please try again.
+        </p>
+      </div>  {% endif %}
+
+    </form>
+  </div>
+</div>
+{% endblock %}

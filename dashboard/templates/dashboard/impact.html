@@ -1,0 +1,123 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+
+    <div class="space-y-8">
+
+    <!-- Header -->
+
+        <div class="space-y-6">
+
+            {% include "components/page_header.html" with icon="📈" title="Impact Analysis" subtitle="Journal performance overview" %}
+
+            {% include "components/filter_bar.html" %}
+
+        </div>
+
+    <!-- Stats -->
+
+        <div class="stats stats-vertical lg:stats-horizontal shadow border border-base-300 w-full">
+
+            {% include "components/stats_cards.html" with title="Journals" value=impact_total_journals color="text-info" %}
+
+            {% include "components/stats_cards.html" with title="Publications" value=impact_total_publications color="text-success" %}
+
+            {% include "components/stats_cards.html" with title="Average IF" value=impact_average_factor|floatformat:2 color="text-warning" %}
+
+            {% include "components/stats_cards.html" with title="Highest IF" value=impact_highest_factor|floatformat:2 color="text-error" %}
+
+        </div>
+
+    <!-- Charts -->
+
+        <div class="grid xl:grid-cols-2 gap-6">
+
+            {% include "components/chart_card.html" with title="Top Journals" id="impactBarChart" %}
+
+            {% include "components/chart_card.html" with title="Publication Distribution" id="impactPieChart" %}
+
+        </div>
+
+    <!-- Table -->
+
+        {% include "tables/impact_table.html" %}
+
+    </div>
+
+    {{ journal_impact_data|json_script:"journal-impact-data" }}
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded",()=>{
+
+            const impactData=JSON.parse(
+                document.getElementById("journal-impact-data").textContent
+            );
+
+            if(!impactData.length)return;
+
+            const top10=impactData.slice(0,10);
+
+            const colors=[
+                "#3b82f6",
+                "#10b981",
+                "#f59e0b",
+                "#ef4444",
+                "#8b5cf6",
+                "#06b6d4",
+                "#84cc16",
+                "#ec4899",
+                "#6366f1",
+                "#f97316"
+            ];
+
+            new Chart(document.getElementById("impactBarChart"),{
+
+                type:"bar",
+
+                data:{
+                    labels:top10.map(x=>x.journal__name),
+                    datasets:[{
+                        data:top10.map(x=>x.average_impact_factor),
+                        backgroundColor:"#3b82f6",
+                        borderRadius:6
+                    }]
+                },
+
+                options:{
+                    responsive:true,
+                    maintainAspectRatio:false,
+                    plugins:{
+                        legend:{display:false}
+                    },
+                    scales:{
+                        y:{beginAtZero:true}
+                    }
+                }
+
+            });
+
+            new Chart(document.getElementById("impactPieChart"),{
+
+                type:"doughnut",
+
+                data:{
+                    labels:top10.map(x=>x.journal__name),
+                    datasets:[{
+                        data:top10.map(x=>x.total_publications),
+                        backgroundColor:colors
+                    }]
+                },
+
+                options:{
+                    responsive:true,
+                    maintainAspectRatio:false
+                }
+
+            });
+
+        });
+
+    </script>
+
+{% endblock %}
