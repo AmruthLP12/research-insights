@@ -1,126 +1,126 @@
-{% extends "dashboard/base.html" %}
+{% extends "base.html" %}
 {% block content %}
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
+    <div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
 
     <!-- ================= MAIN ================= -->
-    <main class="flex-1 p-8">
+        <main class="flex-1 p-8">
 
         <!-- HEADER -->
-        <div class="flex justify-between items-center mb-12">
-            <h1 class="text-3xl font-bold" id="dashboard-title">
-                RRI Roles
-            </h1>
+            <div class="flex justify-between items-center mb-12">
+                <h1 class="text-3xl font-bold" id="dashboard-title">
+                    RRI Roles
+                </h1>
 
             <!-- Dark/Light Mode Toggle -->
-            <button id="theme-toggle" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-200 transition">
-                🌙
-            </button>
-        </div>
-        
-        <!-- ================= FILTER BAR ================= -->
-        <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
-            <div class="flex flex-col md:flex-row gap-4 md:items-center">       
-                <input type="date" id="from"
-                    class="border rounded-lg px-4 py-2">
-                    
-                <input type="date" id="to"                    
-                    class="border rounded-lg px-4 py-2">                    
-                    
-                <input type="text" id="pub-search"
-                    placeholder="Search publications..."
-                    class="border rounded-lg px-4 py-2 w-full md:w-64">                    
-                    
-                <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
-                    Apply
-                </button>   
+                <button id="theme-toggle" class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-200 transition">
+                    🌙
+                </button>
             </div>
 
-            
-        </div>
+        <!-- ================= FILTER BAR ================= -->
+            <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
+                <div class="flex flex-col md:flex-row gap-4 md:items-center">
+                    <input type="date" id="from"
+                           class="border rounded-lg px-4 py-2">
+
+                    <input type="date" id="to"
+                           class="border rounded-lg px-4 py-2">
+
+                    <input type="text" id="pub-search"
+                           placeholder="Search publications..."
+                           class="border rounded-lg px-4 py-2 w-full md:w-64">
+
+                    <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
+                        Apply
+                    </button>
+                </div>
+
+
+            </div>
 
         <!-- ================= RRI ROLE TABLE ================= -->
-        <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-            <h2 class="text-2xl font-bold mb-6 dark:text-gray-200">Role-wise Publication Data</h2>
+            <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
+                <h2 class="text-2xl font-bold mb-6 dark:text-gray-200">Role-wise Publication Data</h2>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead class="bg-gray-100 dark:bg-gray-700">
-                        <tr>
-                            <th class="p-3">Role</th>
-                            <th class="p-3 text-center">Publications</th>
-                            <th class="p-3 text-center">Total Impact Factor</th>
-                            <th class="p-3 text-center">Average Impact Factor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in table %}
-                        <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900">
-                            <td class="p-3">{{ row.authors__rri_role }}</td>
-                            <td class="p-3 text-center">{{ row.total }}</td>
-                            <td class="p-3 text-center">{{ row.total_impact_factor|floatformat:2 }}</td>
-                            <td class="p-3 text-center">{{ row.avg_if|floatformat:2 }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="p-4 text-center text-gray-500 dark:text-gray-400">
-                                No RRI role data available
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-gray-100 dark:bg-gray-700">
+                            <tr>
+                                <th class="p-3">Role</th>
+                                <th class="p-3 text-center">Publications</th>
+                                <th class="p-3 text-center">Total Impact Factor</th>
+                                <th class="p-3 text-center">Average Impact Factor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in table %}
+                                <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900">
+                                    <td class="p-3">{{ row.authors__rri_role }}</td>
+                                    <td class="p-3 text-center">{{ row.total }}</td>
+                                    <td class="p-3 text-center">{{ row.total_impact_factor|floatformat:2 }}</td>
+                                    <td class="p-3 text-center">{{ row.avg_if|floatformat:2 }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="p-4 text-center text-gray-500 dark:text-gray-400">
+                                        No RRI role data available
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-    </main>
-</div>
+        </main>
+    </div>
 
 <!-- ================= COUNTER ANIMATION ================= -->
-<script>
-function animateCounters() {
-    document.querySelectorAll('.counter').forEach(counter => {
-        const target = +counter.dataset.value;
-        let current = 0;
-        const increment = target / 50;
-        const update = () => {
-            current += increment;
-            if(current < target){
-                counter.innerText = Math.floor(current);
-                requestAnimationFrame(update);
-            } else {
-                counter.innerText = target;
-            }
-        };
-        update();
-    });
-}
-animateCounters();
-</script>
+    <script>
+        function animateCounters() {
+            document.querySelectorAll('.counter').forEach(counter => {
+                const target = +counter.dataset.value;
+                let current = 0;
+                const increment = target / 50;
+                const update = () => {
+                    current += increment;
+                    if(current < target){
+                        counter.innerText = Math.floor(current);
+                        requestAnimationFrame(update);
+                    } else {
+                        counter.innerText = target;
+                    }
+                };
+                update();
+            });
+        }
+        animateCounters();
+    </script>
 
 <!-- ================= DARK/LIGHT MODE ================= -->
-<script>
-const toggle = document.getElementById('theme-toggle');
-if(localStorage.getItem('theme') === 'dark') {
-    document.documentElement.classList.add('dark');
-    toggle.textContent = '☀️';
-} else {
-    document.documentElement.classList.remove('dark');
-    toggle.textContent = '🌙';
-}
+    <script>
+        const toggle = document.getElementById('theme-toggle');
+        if(localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+            toggle.textContent = '☀️';
+        } else {
+            document.documentElement.classList.remove('dark');
+            toggle.textContent = '🌙';
+        }
 
-toggle.addEventListener('click', () => {
-    document.documentElement.classList.toggle('dark');
-    if(document.documentElement.classList.contains('dark')) {
-        localStorage.setItem('theme', 'dark');
-        toggle.textContent = '☀️';
-    } else {
-        localStorage.setItem('theme', 'light');
-        toggle.textContent = '🌙';
-    }
-});
-</script>
+        toggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            if(document.documentElement.classList.contains('dark')) {
+                localStorage.setItem('theme', 'dark');
+                toggle.textContent = '☀️';
+            } else {
+                localStorage.setItem('theme', 'light');
+                toggle.textContent = '🌙';
+            }
+        });
+    </script>
 
 {% endblock %}

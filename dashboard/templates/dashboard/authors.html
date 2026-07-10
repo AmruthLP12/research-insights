@@ -1,101 +1,101 @@
-{% extends "dashboard/base.html" %}
+{% extends "base.html" %}
 {% block content %}
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
+    <div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
 
     <!-- ================= MAIN ================= -->
-    <main class="flex-1 p-8">
+        <main class="flex-1 p-8">
 
         <!-- HEADER -->
-        <div class="flex justify-between items-center mb-12">
-            <h1 class="text-3xl font-bold" id="dashboard-title">
-                Authors Overview
-            </h1>
-        </div>
+            <div class="flex justify-between items-center mb-12">
+                <h1 class="text-3xl font-bold" id="dashboard-title">
+                    Authors Overview
+                </h1>
+            </div>
 
         <!-- ================= FILTER BAR ================= -->
-        <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
-            <div class="flex flex-col md:flex-row gap-4 md:items-center">
+            <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
+                <div class="flex flex-col md:flex-row gap-4 md:items-center">
 
-                <input type="date" id="from"
-                    class="border rounded-lg px-4 py-2">
+                    <input type="date" id="from"
+                           class="border rounded-lg px-4 py-2">
 
-                <input type="date" id="to"
-                    class="border rounded-lg px-4 py-2">
+                    <input type="date" id="to"
+                           class="border rounded-lg px-4 py-2">
 
-                <input type="text" id="pub-search"
-                    placeholder="Search publications..."
-                    class="border rounded-lg px-4 py-2 w-full md:w-64">
+                    <input type="text" id="pub-search"
+                           placeholder="Search publications..."
+                           class="border rounded-lg px-4 py-2 w-full md:w-64">
 
-                <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
-                    Apply
-                </button>
+                    <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
+                        Apply
+                    </button>
 
+                </div>
             </div>
-        </div>     
         <!-- ================= AUTHORS TABLE ================= -->
-        <div class="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 class="text-2xl font-bold mb-6">Authors List</h2>
+            <div class="bg-white rounded-2xl p-6 shadow-sm">
+                <h2 class="text-2xl font-bold mb-6">Authors List</h2>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="p-3">Author</th>
-                            <th class="p-3">RRI Role</th>
-                            <th class="p-3 text-center">Affiliations</th>
-                            <th class="p-3 text-center">Publications</th>
-                            <th class="p-3 text-center">Total Impact Factor</th>
-                            <th class="p-3 text-center">Average Impact Factor</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in table %}
-                        <tr class="border-t border-gray-200 hover:bg-gray-50">
-                            <td class="p-3">{{ row.authors__first_name }} {{ row.authors__last_name }}</td>
-                            <td class="p-3">{{ row.authors__rri_role }}</td>
-                            <td class="p-3 text-center">{{ row.authors__author_affiliations__affiliation__name }}</td>
-                            <td class="p-3 text-center">{{ row.total }}</td>
-                            <td class="p-3 text-center">{{ row.total_impact_factor }}</td>
-                            <td class="p-3 text-center">{{ row.avg_impact_factor }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="6" class="p-4 text-center text-gray-500">
-                                No author data available
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-3">Author</th>
+                                <th class="p-3">RRI Role</th>
+                                <th class="p-3 text-center">Affiliations</th>
+                                <th class="p-3 text-center">Publications</th>
+                                <th class="p-3 text-center">Total Impact Factor</th>
+                                <th class="p-3 text-center">Average Impact Factor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in table %}
+                                <tr class="border-t border-gray-200 hover:bg-gray-50">
+                                    <td class="p-3">{{ row.authors__first_name }} {{ row.authors__last_name }}</td>
+                                    <td class="p-3">{{ row.authors__rri_role }}</td>
+                                    <td class="p-3 text-center">{{ row.authors__author_affiliations__affiliation__name }}</td>
+                                    <td class="p-3 text-center">{{ row.total }}</td>
+                                    <td class="p-3 text-center">{{ row.total_impact_factor }}</td>
+                                    <td class="p-3 text-center">{{ row.avg_impact_factor }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="6" class="p-4 text-center text-gray-500">
+                                        No author data available
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
         <!-- ================= COUNTER ANIMATION ================= -->
-        <script>
-        function animateCounters() {
-            document.querySelectorAll('.counter').forEach(counter => {
-                const target = +counter.dataset.value;
-                let current = 0;
-                const increment = target / 50;
-                const update = () => {
-                    current += increment;
-                    if(current < target){
-                        counter.innerText = Math.floor(current);
-                        requestAnimationFrame(update);
-                    } else {
-                        counter.innerText = target;
-                    }
-                };
-                update();
-            });
-        }
-        animateCounters();
-        </script>  
-        
-    </main>
-</div>
+            <script>
+                function animateCounters() {
+                    document.querySelectorAll('.counter').forEach(counter => {
+                        const target = +counter.dataset.value;
+                        let current = 0;
+                        const increment = target / 50;
+                        const update = () => {
+                            current += increment;
+                            if(current < target){
+                                counter.innerText = Math.floor(current);
+                                requestAnimationFrame(update);
+                            } else {
+                                counter.innerText = target;
+                            }
+                        };
+                        update();
+                    });
+                }
+                animateCounters();
+            </script>
+
+        </main>
+    </div>
 
 {% endblock %}

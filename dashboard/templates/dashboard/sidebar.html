@@ -1,118 +1,118 @@
-<aside class="w-80 h-screen sticky top-0 flex flex-col bg-base-100 border-r border-base-300">
+{% load static %}
 
-    <!-- Logo -->
-    <div class="px-8 py-8 border-b border-base-300">
-        <h1 class="text-3xl font-bold">
-            Research Dashboard
-        </h1>
+<!-- Mobile Backdrop -->
+<div x-show="isSidebarOpen"
+     x-transition:enter="transition-opacity ease-linear duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition-opacity ease-linear duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     @click="isSidebarOpen = false"
+     class="fixed inset-0 bg-black/50 z-40 lg:hidden"
+     style="display: none;">
+</div>
 
-        <p class="text-sm opacity-60 mt-1">
-            Raman Research Institute
-        </p>
+<aside
+    class="fixed inset-y-0 left-0 z-50 flex flex-col h-screen bg-base-100 border-r border-base-300 transition-all duration-300 ease-in-out shrink-0"
+    :class="[
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+            isCollapsed ? 'lg:w-[76px] w-72' : 'w-72'
+            ]"
+>
+    <!-- Logo / Brand -->
+    <div class="relative flex items-center gap-3 h-20 px-5 border-b border-base-300 shrink-0">
+        <div class="flex items-center justify-center w-10 h-10 rounded-xl bg-neutral text-neutral-content font-bold text-lg shrink-0">
+            R
+        </div>
+        <div x-show="!isCollapsed" x-transition class="overflow-hidden">
+            <h1 class="text-base font-bold tracking-tight leading-tight whitespace-nowrap">Research Dashboard</h1>
+            <p class="text-xs opacity-50 whitespace-nowrap">Raman Research Institute</p>
+        </div>
+
+        <button @click="isSidebarOpen = false" class="ml-auto lg:hidden btn btn-ghost btn-sm btn-circle">
+            <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
     </div>
+
+    <!-- Collapse toggle (desktop only) -->
+    <button @click="isCollapsed = !isCollapsed"
+            class="hidden lg:flex items-center justify-center absolute -right-3 top-[68px] w-6 h-6 rounded-full bg-base-100 border border-base-300 shadow-sm hover:bg-base-200 z-10">
+        <i data-lucide="chevron-left" class="w-3.5 h-3.5 transition-transform duration-300" :class="isCollapsed && 'rotate-180'"></i>
+    </button>
 
     <!-- Navigation -->
-    <div class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
-
+    <nav class="flex-1 overflow-y-auto overflow-x-hidden px-3 py-5 space-y-6">
         {% for section in dashboard_sidebar %}
-
-            <div class="collapse collapse-arrow bg-transparent">
-
-                <input type="checkbox" checked>
-
-                <div class="collapse-title text-base font-semibold px-3 py-4 min-h-0">
+            <div>
+                <p x-show="!isCollapsed" x-transition
+                   class="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider opacity-40 whitespace-nowrap">
                     {{ section.title }}
-                </div>
+                </p>
+                <ul class="space-y-1">
+                    {% for item in section.items %}
+                        <li class="relative">
+                            {% if request.resolver_match.url_name == item.url_name %}
+                                <span class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-neutral"
+                                      :class="isCollapsed && 'lg:hidden'"></span>
+                            {% endif %}
 
-                <div class="collapse-content pt-1">
-
-                    <ul class="menu gap-1">
-
-                        {% for item in section.items %}
-
-                            <li>
-
-                                <a
-                                    href="{{ item.url }}"
-                                    class="
-                                           py-3 rounded-xl
-                                           {% if request.resolver_match.url_name == item.url_name %}
-                                               bg-primary text-primary-content font-medium
-                                           {% else %}
-                                               hover:bg-base-200
-                                           {% endif %}
-                                          "
-                                >
-                                    {{ item.title }}
-                                </a>
-
-                            </li>
-
-                        {% endfor %}
-
-                    </ul>
-
-                </div>
-
+                            <a href="{{ item.url }}"
+                               :class="isCollapsed && 'lg:justify-center lg:px-0'"
+                               title="{{ item.title }}"
+                               class="group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
+                                      {% if request.resolver_match.url_name == item.url_name %}
+                                          bg-base-300 text-base-content font-semibold
+                                      {% else %}
+                                          text-base-content/70 hover:bg-base-200 hover:text-base-content
+                                      {% endif %}">
+                                <i data-lucide="{{ item.icon }}" class="w-[18px] h-[18px] shrink-0"></i>
+                                <span x-show="!isCollapsed" x-transition class="whitespace-nowrap">{{ item.title }}</span>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
             </div>
-
         {% endfor %}
-
-    </div>
+    </nav>
 
     <!-- Footer -->
-    <div class="border-t border-base-300 p-5 space-y-4">
-
-        <a
-            href="{% url 'publications:list' %}"
-            class="btn btn-primary w-full"
-        >
-            Publications
+    <div class="border-t border-base-300 p-3 space-y-3 shrink-0">
+        <a href="{% url 'publications:list' %}"
+           :class="isCollapsed && 'lg:px-0'"
+           class="btn btn-neutral w-full gap-2">
+            <i data-lucide="library" class="w-4 h-4 shrink-0"></i>
+            <span x-show="!isCollapsed" x-transition class="whitespace-nowrap">Publications</span>
         </a>
 
         {% if request.user.is_authenticated %}
-
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-base-200">
-
-                <div class="avatar placeholder">
-                    <div class="bg-primary text-primary-content rounded-full w-12">
-                        <span class="text-lg">
-                            {{ request.user.first_name|default:request.user.username|first|upper }}
-                        </span>
+            <div :class="isCollapsed && 'lg:justify-center'"
+                 class="flex items-center gap-3 p-2.5 rounded-xl bg-base-200">
+                <div class="avatar placeholder shrink-0">
+                    <div class="bg-neutral text-neutral-content rounded-full w-9">
+                        <span class="text-sm">{{ request.user.first_name|default:request.user.username|first|upper }}</span>
                     </div>
                 </div>
-
-                <div class="flex-1 min-w-0">
-                    <p class="font-medium truncate">
-                        {{ request.user.get_full_name|default:request.user.username }}
-                    </p>
-
-                    <p class="text-xs opacity-60 truncate">
-                        {{ request.user.email }}
-                    </p>
+                <div x-show="!isCollapsed" x-transition class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate">{{ request.user.get_full_name|default:request.user.username }}</p>
+                    <p class="text-xs opacity-50 truncate">{{ request.user.email }}</p>
                 </div>
-
             </div>
 
             <form method="post" action="{% url 'accounts:logout' %}">
                 {% csrf_token %}
-
-                <button class="btn btn-outline btn-error w-full">
-                    Logout
+                <button type="submit"
+                        :class="isCollapsed && 'lg:px-0'"
+                        class="btn btn-outline btn-error btn-sm w-full gap-2">
+                    <i data-lucide="log-out" class="w-4 h-4 shrink-0"></i>
+                    <span x-show="!isCollapsed" x-transition class="whitespace-nowrap">Logout</span>
                 </button>
             </form>
-
         {% else %}
-
-            <a
-                href="{% url 'accounts:login' %}"
-                class="btn btn-outline btn-primary w-full"
-            >
-                Login
+            <a href="{% url 'accounts:login' %}" class="btn btn-outline btn-sm w-full gap-2">
+                <i data-lucide="log-in" class="w-4 h-4 shrink-0"></i>
+                <span x-show="!isCollapsed" x-transition>Login</span>
             </a>
-
         {% endif %}
-
     </div>
-
 </aside>
