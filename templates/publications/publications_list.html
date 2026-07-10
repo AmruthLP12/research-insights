@@ -1,69 +1,69 @@
-{% extends "dashboard/base.html" %}
+{% extends "base.html" %}
 {% block title %}Publications{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto py-8">
+  <div class="max-w-7xl mx-auto py-8">
 
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">
-      Publications
-    </h1>
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">
+        Publications
+      </h1>
 
-    <a href="{% url 'publications:wos_upload' %}"
-       class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-      + Upload WoS File
-    </a>
+      <a href="{% url 'publications:wos_upload' %}"
+         class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+        + Upload WoS File
+      </a>
+    </div>
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+      <table class="min-w-full border-collapse">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="px-4 py-3 text-left text-sm font-semibold">Title</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold">Journal</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold">Year</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold">Document Type</th>
+            <th class="px-4 py-3 text-left text-sm font-semibold">Authors</th>
+          </tr>
+        </thead>
+
+        <tbody class="divide-y">
+          {% for p in publications %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 text-sm text-gray-800">
+                {{ p.title }}
+              </td>
+
+              <td class="px-4 py-3 text-sm">
+                {{ p.journal.name|default:"—" }}
+              </td>
+
+              <td class="px-4 py-3 text-sm">
+                {{ p.date_published.year|default:"—" }}
+              </td>
+
+              <td class="px-4 py-3 text-sm">
+                {{ p.document_type|default:"—" }}
+              </td>
+
+              <td class="px-4 py-3 text-sm">
+                {% for a in p.authors.all %}
+                  {{ a.first_name }} {{ a.last_name }}{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                  —
+                {% endfor %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="text-center py-6 text-gray-500">
+                No publications found.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
   </div>
-
-  <div class="bg-white shadow rounded-lg overflow-hidden">
-    <table class="min-w-full border-collapse">
-      <thead class="bg-gray-100">
-        <tr>
-          <th class="px-4 py-3 text-left text-sm font-semibold">Title</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold">Journal</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold">Year</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold">Document Type</th>
-          <th class="px-4 py-3 text-left text-sm font-semibold">Authors</th>
-        </tr>
-      </thead>
-
-      <tbody class="divide-y">
-        {% for p in publications %}
-        <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-sm text-gray-800">
-            {{ p.title }}
-          </td>
-
-          <td class="px-4 py-3 text-sm">
-            {{ p.journal.name|default:"—" }}
-          </td>
-
-          <td class="px-4 py-3 text-sm">
-            {{ p.date_published.year|default:"—" }}
-          </td>
-
-          <td class="px-4 py-3 text-sm">
-            {{ p.document_type|default:"—" }}
-          </td>
-
-          <td class="px-4 py-3 text-sm">
-            {% for a in p.authors.all %}
-              {{ a.first_name }} {{ a.last_name }}{% if not forloop.last %}, {% endif %}
-            {% empty %}
-              —
-            {% endfor %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="5" class="text-center py-6 text-gray-500">
-            No publications found.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-
-</div>
 {% endblock %}
