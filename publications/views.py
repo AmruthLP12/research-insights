@@ -8,11 +8,18 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.forms import modelformset_factory
+from django.urls import reverse
 
 from .forms import PublicationForm, AuthorForm
 from .models import Author, Journal, Affiliation, AuthorAffiliation, Publication
 from .utils.wos_parser import parse_wos_file
 from django.views.generic import DetailView
+from django.db.models import Count, Avg, Sum, Max
+
+from dashboard.filters import DynamicFilter
+
+from django.views.generic import TemplateView
+from django.core.paginator import Paginator
 
 
 # =====================================================
@@ -22,31 +29,170 @@ def is_rri_affiliation(name):
     if not name:
         return False
     name = name.lower()
-    return any(k in name for k in [
-        "raman",
-        "raman res inst",
-        "raman research institute",
-        "rri",
-    ])
+    return any(
+        k in name
+        for k in [
+            "raman",
+            "raman res inst",
+            "raman research institute",
+            "rri",
+        ]
+    )
 
 
 # =====================================================
 # PUBLICATIONS LIST ( /publications/ )
 # =====================================================
-# @login_required
-def publications_list(request):
-    publications = (
-        Publication.objects
-        .select_related("journal")
-        .prefetch_related("authors", "departments")
-        .order_by("-date_published")
-    )
-    return render(
-        request,
-        "publications/publications_list.html",
-        {"publications": publications}
-    )
 
+
+class PublicationsListView(TemplateView):
+    template_name = "publications/publications_list.html"
+
+    paginate_by = 10
+
+    search_fields = [
+        "title",
+        "journal__name",
+        "doi",
+        "authors__first_name",
+        "authors__last_name",
+        "departments__name",
+    ]
+
+    exact_filters = [
+        "document_type",
+        "collaboration_type",
+    ]
+
+    date_filters = [
+        "date_published",
+    ]
+
+    sortable_columns = [
+        "date_published",
+        "title",
+    ]
+
+    gt_filters = []
+
+    lt_filters = []
+
+    
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        # --------------------------------------------------
+        # Publications queryset
+        # --------------------------------------------------
+
+        publications = (
+            Publication.objects.select_related("journal")
+            .prefetch_related(
+                "authors",
+                "departments",
+            )
+            .order_by("-date_published")
+        )
+
+        # --------------------------------------------------
+        # Filters
+        # --------------------------------------------------
+
+        filterset = DynamicFilter(
+            self.request.GET,
+            queryset=publications,
+            view=self,
+        )
+
+        publications = filterset.qs
+
+        # --------------------------------------------------
+        # Pagination
+        # --------------------------------------------------
+
+        paginator = Paginator(publications, self.paginate_by)
+
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        # --------------------------------------------------
+        # Chart Data - Year wise publications
+        # --------------------------------------------------
+
+        publication_trend = (
+            publications.values("date_published__year")
+            .annotate(
+                total=Count("id"),
+                total_impact_factor=Sum("journal__impact_factor"),
+                average_impact_factor=Avg("journal__impact_factor"),
+            )
+            .order_by("date_published__year")
+        )
+
+        publication_trend_data = list(publication_trend)
+
+        # --------------------------------------------------
+        # Summary Cards
+        # --------------------------------------------------
+
+        summary = publications.aggregate(
+            total_publications=Count("id"),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        context.update(
+            {
+                # Filters
+                "filter": filterset,
+                # Table
+                "page_obj": page_obj,
+                "publications": page_obj,
+                # Charts
+                "publication_trend_data": publication_trend_data,
+                # KPI
+                "publication_count": (summary["total_publications"] or 0),
+                "publication_total_impact": (summary["total_impact_factor"] or 0),
+                "publication_average_impact": (summary["average_impact_factor"] or 0),
+                "publication_highest_impact": (summary["highest_impact_factor"] or 0),
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Publications",
+                    },
+                ],
+            }
+        )
+
+        return context
+
+
+
+class PublicationDetailView(DetailView):
+    model = Publication
+    template_name = "publications/publication_detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        publication = self.object
+
+        context.update({
+            "authors": publication.authors.all(),
+            "departments": publication.departments.all(),
+            "affiliations": publication.author_affiliations.select_related(
+                "author",
+                "affiliation",
+            ),
+            "citations": publication.yearly_citations.all(),
+        })
+
+        return context
 
 # =====================================================
 # WOS UPLOAD
@@ -60,7 +206,7 @@ def wos_upload(request):
             messages.error(
                 request,
                 "File was read successfully but no publication records were detected. "
-                "Please ensure the file is exported as FULL RECORD in tab-delimited format."
+                "Please ensure the file is exported as FULL RECORD in tab-delimited format.",
             )
             return redirect("publications:wos_upload")
 
@@ -89,33 +235,28 @@ def wos_review(request):
 
     journal = None
     if pub.get("journal_name"):
-        journal, _ = Journal.objects.get_or_create(
-            name=pub["journal_name"]
-        )
+        journal, _ = Journal.objects.get_or_create(name=pub["journal_name"])
 
     date_published = None
     if pub.get("date_published"):
-        date_published = datetime.strptime(
-            pub["date_published"], "%Y-%m-%d"
-        ).date()
+        date_published = datetime.strptime(pub["date_published"], "%Y-%m-%d").date()
 
-    pub_form = PublicationForm(initial={
-        "document_type": pub.get("document_type"),
-        "date_published": date_published,
-        "title": pub.get("title"),
-        "journal": journal.id if journal else None,
-        "volume": pub.get("volume"),
-        "issue": pub.get("issue"),
-        "page_number": pub.get("page_number"),
-        "doi": pub.get("doi"),
-        "collaboration_type": pub.get("collaboration_type"),
-    })
+    pub_form = PublicationForm(
+        initial={
+            "document_type": pub.get("document_type"),
+            "date_published": date_published,
+            "title": pub.get("title"),
+            "journal": journal.id if journal else None,
+            "volume": pub.get("volume"),
+            "issue": pub.get("issue"),
+            "page_number": pub.get("page_number"),
+            "doi": pub.get("doi"),
+            "collaboration_type": pub.get("collaboration_type"),
+        }
+    )
 
     AuthorFormSet = modelformset_factory(
-        Author,
-        form=AuthorForm,
-        extra=len(authors),
-        can_delete=True
+        Author, form=AuthorForm, extra=len(authors), can_delete=True
     )
 
     initial = []
@@ -123,17 +264,16 @@ def wos_review(request):
         affiliations = a.get("affiliations_json", [])
         has_rri = any(is_rri_affiliation(x.get("name")) for x in affiliations)
 
-        initial.append({
-            "first_name": a.get("first_name"),
-            "last_name": a.get("last_name"),
-            "rri_role": "" if has_rri else "External",
-            "affiliations_json": json.dumps(affiliations),
-        })
+        initial.append(
+            {
+                "first_name": a.get("first_name"),
+                "last_name": a.get("last_name"),
+                "rri_role": "" if has_rri else "External",
+                "affiliations_json": json.dumps(affiliations),
+            }
+        )
 
-    formset = AuthorFormSet(
-        queryset=Author.objects.none(),
-        initial=initial
-    )
+    formset = AuthorFormSet(queryset=Author.objects.none(), initial=initial)
 
     # Attach decoded affiliations for template display
     for form in formset:
@@ -152,7 +292,7 @@ def wos_review(request):
             "author_formset": formset,
             "index": index + 1,
             "total": len(records),
-        }
+        },
     )
 
 
@@ -174,15 +314,9 @@ def wos_save(request):
     pub_form = PublicationForm(request.POST)
 
     AuthorFormSet = modelformset_factory(
-        Author,
-        form=AuthorForm,
-        extra=0,
-        can_delete=True
+        Author, form=AuthorForm, extra=0, can_delete=True
     )
-    formset = AuthorFormSet(
-        request.POST,
-        queryset=Author.objects.none()
-    )
+    formset = AuthorFormSet(request.POST, queryset=Author.objects.none())
 
     if not pub_form.is_valid() or not formset.is_valid():
         messages.error(request, "Please correct the errors below.")
@@ -202,9 +336,7 @@ def wos_save(request):
         author = form.save()
         publication.authors.add(author)
 
-        affiliations = json.loads(
-            form.cleaned_data.get("affiliations_json", "[]")
-        )
+        affiliations = json.loads(form.cleaned_data.get("affiliations_json", "[]"))
 
         for aff in affiliations:
             affiliation, _ = Affiliation.objects.get_or_create(
@@ -235,9 +367,4 @@ def wos_success(request):
     return render(request, "publications/wos_success.html")
 
 
-class PublicationDetailView(DetailView):
-    model = Publication
-    template_name = "publications/publication_detail.html"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)    

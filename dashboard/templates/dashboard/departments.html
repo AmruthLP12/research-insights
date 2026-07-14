@@ -1,81 +1,384 @@
 {% extends "base.html" %}
+
 {% block content %}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
-
-    <!-- ================= MAIN ================= -->
-        <main class="flex-1 p-8">
-
-        <!-- HEADER -->
-            <div class="flex justify-between items-center mb-12">
-                <h1 class="text-3xl font-bold" id="dashboard-title">
-                    Departments Overview
-                </h1>
+    <div class="space-y-8">
 
 
-            </div>
+    <!-- Header + Filters -->
 
-        <!-- ================= FILTER BAR ================= -->
-            <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
-                <div class="flex flex-col md:flex-row gap-4 md:items-center">
-                    <input type="date" id="from"
-                           class="border rounded-lg px-4 py-2">
+        <div class="space-y-6">
 
-                    <input type="date" id="to"
-                           class="border rounded-lg px-4 py-2">
+            {% include "components/page_header.html" with icon="🏢" title="Department Analysis" subtitle="Department-wise publication distribution and impact analysis." %}
 
-                    <input type="text" id="pub-search"
-                           placeholder="Search publications..."
-                           class="border rounded-lg px-4 py-2 w-full md:w-64">
+            {% include "components/filter_bar.html" %}
 
-                    <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
-                        Apply
-                    </button>
+        </div>
+
+
+
+    <!-- KPI -->
+
+        <div class="stats stats-vertical md:stats-horizontal shadow border border-base-300 w-full bg-base-100">
+
+            {% include "components/stats_cards.html" with title="Departments" value=department_count color="text-primary" %}
+
+            {% include "components/stats_cards.html" with title="Publications" value=department_total_publications color="text-secondary" %}
+
+            {% include "components/stats_cards.html" with title="Average Impact" value=department_average_impact|floatformat:2 color="text-accent" %}
+
+            {% include "components/stats_cards.html" with title="Highest Impact" value=department_highest_impact|floatformat:2 color="text-success" %}
+
+        </div>
+
+
+
+
+    <!-- Charts -->
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            {% include "components/chart_card.html" with title="Publications by Department" id="departmentBarChart" %}
+
+            {% include "components/chart_card.html" with title="Impact Distribution" id="departmentPieChart" %}
+
+        </div>
+
+
+
+
+    <!-- Table -->
+
+        <div class="card bg-base-100 shadow border border-base-300">
+
+            <div class="card-body">
+
+
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+
+
+                    <div>
+
+                        <h2 class="card-title">
+                            Department Summary
+                        </h2>
+
+
+                        <p class="text-sm text-base-content/60">
+
+                            Showing
+
+                            {{ page_obj.start_index }}
+
+                            -
+
+                            {{ page_obj.end_index }}
+
+                            of
+
+                            {{ page_obj.paginator.count }}
+
+                            departments
+
+                        </p>
+
+
+                    </div>
+
+
+
+                    <span class="badge badge-primary badge-outline badge-lg">
+
+                        {{ page_obj.paginator.count }}
+
+                        Departments
+
+                    </span>
+
+
                 </div>
 
-            </div>
 
 
-        <!-- ================= DEPARTMENTS TABLE ================= -->
-            <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm">
-                <h2 class="text-2xl font-bold mb-6 dark:text-gray-200">Departments List</h2>
+
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead class="bg-gray-100 dark:bg-gray-700">
+
+                    <table class="table table-zebra table-pin-rows">
+
+                        <thead>
+
                             <tr>
-                                <th class="p-3">Department</th>
-                                <th class="p-3 text-center">Publications</th>
-                                <th class="p-3 text-center">Total Impact Factor</th>
-                                <th class="p-3 text-center">Average Impact Factor</th>
+
+                                <th>#</th>
+
+                                <th>
+                                    Department
+                                </th>
+
+                                <th class="text-center">
+                                    Publications
+                                </th>
+
+                                <th class="text-center">
+                                    Total IF
+                                </th>
+
+                                <th class="text-center">
+                                    Average IF
+                                </th>
+
+                                <th class="text-center">
+                                    Share
+                                </th>
+
                             </tr>
+
                         </thead>
+
+
+
                         <tbody>
-                            {% for row in table %}
-                                <tr class="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900">
-                                    <td class="p-3">{{ row.departments__name }}</td>
-                                    <td class="p-3 text-center">{{ row.total }}</td>
-                                    <td class="p-3 text-center">{{ row.dept_total_impact_factor|floatformat:2 }}</td>
-                                    <td class="p-3 text-center">{{ row.dept_avg_if|floatformat:2 }}</td>
-                                </tr>
-                            {% empty %}
+
+
+                            {% for row in page_obj %}
+
+
                                 <tr>
-                                    <td colspan="4" class="p-4 text-center text-gray-500 dark:text-gray-400">
-                                        No department data available
+
+
+                                    <td>
+                                        {{ page_obj.start_index|add:forloop.counter0 }}
                                     </td>
+
+
+
+                                    <td>
+                                        {{ row.departments__name }}
+                                    </td>
+
+
+
+                                    <td class="text-center">
+
+                                        <span class="badge badge-primary badge-outline">
+
+                                            {{ row.total_publications }}
+
+                                        </span>
+
+                                    </td>
+
+
+
+                                    <td class="text-center">
+
+                                        {{ row.total_impact_factor|default:0|floatformat:2 }}
+
+                                    </td>
+
+
+
+                                    <td class="text-center">
+
+                                        <span class="badge badge-success badge-outline">
+
+                                            {{ row.average_impact_factor|default:0|floatformat:2 }}
+
+                                        </span>
+
+                                    </td>
+
+
+
+                                    <td class="text-center">
+
+                                        {% widthratio row.total_publications department_total_publications 100 %}%
+
+                                    </td>
+
+
                                 </tr>
+
+
+                            {% empty %}
+
+
+                                <tr>
+
+                                    <td colspan="6">
+
+                                        {% include "components/empty_state.html" with title="No department data found" description="Try changing your filters." %}
+
+                                    </td>
+
+                                </tr>
+
+
                             {% endfor %}
+
+
                         </tbody>
+
+
                     </table>
+
+
                 </div>
+
+
+
+                {% include "components/pagination.html" with object_name="departments" %}
+
+
             </div>
 
-        </main>
+        </div>
+
+
     </div>
+
+
+
+
+    {{ departments_data|json_script:"departments-data" }}
+
+
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+
+            const data = JSON.parse(
+                document.getElementById("departments-data").textContent
+            );
+
+
+            if (!data.length) return;
+
+
+
+            const labels = data.map(
+                x => x.departments__name
+            );
+
+
+            const totals = data.map(
+                x => x.total_publications
+            );
+
+
+            const impacts = data.map(
+                x => x.total_impact_factor || 0
+            );
+
+
+
+            const colors = [
+                "#4f46e5",
+                "#06b6d4",
+                "#22c55e",
+                "#f59e0b",
+                "#ef4444",
+                "#8b5cf6",
+                "#ec4899",
+                "#14b8a6",
+                "#84cc16",
+                "#6366f1"
+            ];
+
+
+
+            new Chart(
+                document.getElementById("departmentBarChart"),
+                {
+                    type:"bar",
+
+                    data:{
+                        labels,
+
+                        datasets:[{
+
+                            data:totals,
+
+                            backgroundColor:"#4f46e5",
+
+                            borderRadius:8,
+
+                            maxBarThickness:45
+
+                        }]
+                    },
+
+                    options:{
+                        responsive:true,
+
+                        maintainAspectRatio:false,
+
+                        plugins:{
+                            legend:{
+                                display:false
+                            }
+                        },
+
+                        scales:{
+                            y:{
+                                beginAtZero:true
+                            }
+                        }
+                    }
+                }
+            );
+
+
+
+
+
+            new Chart(
+                document.getElementById("departmentPieChart"),
+                {
+
+                    type:"doughnut",
+
+                    data:{
+
+                        labels,
+
+                        datasets:[{
+
+                            data:impacts,
+
+                            backgroundColor:colors
+
+                        }]
+
+                    },
+
+
+                    options:{
+
+                        responsive:true,
+
+                        maintainAspectRatio:false,
+
+                        plugins:{
+
+                            legend:{
+                                position:"bottom"
+                            }
+
+                        }
+
+                    }
+
+                }
+            );
+
+
+        });
 
     </script>
 
- <!-- ================= DARK/LIGHT MODE ================= -->
+
 {% endblock %}

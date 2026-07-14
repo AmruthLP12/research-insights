@@ -1,70 +1,249 @@
 {% extends "base.html" %}
+
 {% block title %}{{ publication.title }}{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto py-8">
 
-  <h1 class="text-2xl font-bold mb-4">
-    {{ publication.title }}
-  </h1>
+    <div class="max-w-7xl mx-auto py-8 space-y-6">
 
-  <p class="text-gray-700 mb-2">
-    <strong>Journal:</strong>
-    {{ publication.journal }}
-  </p>
+        <div class="text-sm breadcrumbs">
+            <ul>
+                <li><a href="{% url 'dashboard:home' %}" class="text-base-content/60 hover:text-primary">Dashboard</a></li>
+                <li><a href="{% url 'publications:list' %}" class="text-base-content/60 hover:text-primary">Publications</a></li>
+                <li class="text-base-content">{{ publication.title|truncatechars:40 }}</li>
+            </ul>
+        </div>
 
-  <p class="text-gray-700 mb-2">
-    <strong>Date:</strong>
-    {{ publication.date_published }}
-  </p>
+        <div class="card bg-base-100 shadow border border-base-300">
+            <div class="card-body">
 
-  <p class="text-gray-700 mb-2">
-    <strong>Document Type:</strong>
-    {{ publication.document_type }}
-  </p>
+                <h1 class="text-2xl font-bold">
+                    {{ publication.title }}
+                </h1>
 
-  <p class="text-gray-700 mb-2">
-    <strong>Full Text:</strong>
-    <a href="{{ publication.full_text_url }}" target="_blank">
-      {{ publication.full_text_url }}
-    </a>  
-    {% if publication.full_text_url %}
-      <a href="{{ publication.full_text_url }}" target="_blank" class="text-blue-500 underline">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-        </svg>
-      </a>
-    {% endif %}
-  </p>
+                <div class="flex flex-wrap gap-2 mt-3">
 
-  {% if publication.abstract %}
-    <p class="text-gray-700 mb-2">
-      <strong>Abstract:</strong>
-      {{ publication.abstract }}
-    </p>
-  <hr class="my-4">
+                    {% if publication.document_type %}
+                        <span class="badge badge-primary badge-outline">
+                            {{ publication.document_type }}
+                        </span>
+                    {% endif %}
 
-  <h2 class="font-semibold mb-2">Authors</h2>
-  <ul class="list-disc ml-6">
-    {% for author in publication.authors.all %}
-      <li>
-        {{ author.first_name }} {{ author.last_name }}
-        {% if author.rri_role %} ({{ author.rri_role }}){% endif %}
-      </li>
-    {% endfor %}
-  </ul>
-  <p class="text-gray-700 mb-2">
-    <strong>Citation:</strong>  
-    {{ publication.citation }}
-    {% if publication.citation %}
-      <a href="{{ publication.citation }}" target="_blank" class="text-blue-500 underline">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-        </svg>
-      </a>
-    {% endif %}
-  </p>
-  
+                    {% if publication.collaboration_type %}
+                        <span class="badge badge-info badge-outline">
+                            {{ publication.collaboration_type }}
+                        </span>
+                    {% endif %}
 
-</div>
+                    {% if publication.journal.impact_factor %}
+                        <span class="badge badge-warning badge-outline">
+                            IF {{ publication.journal.impact_factor|floatformat:2 }}
+                        </span>
+                    {% endif %}
+
+                </div>
+
+                <div class="divider my-2"></div>
+
+                <div class="grid md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+
+                    <div>
+                        <span class="text-base-content/50">Journal</span>
+                        <p class="font-medium">{{ publication.journal|default:"—" }}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-base-content/50">Published Date</span>
+                        <p class="font-medium">{{ publication.date_published|default:"—" }}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-base-content/50">Document Type</span>
+                        <p class="font-medium">{{ publication.document_type|default:"—" }}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-base-content/50">Collaboration</span>
+                        <p class="font-medium">{{ publication.collaboration_type|default:"—" }}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-base-content/50">Impact Factor</span>
+                        <p class="font-medium">{{ publication.journal.impact_factor|default:"—" }}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-base-content/50">DOI</span>
+                        <p class="font-medium">
+                            {% if publication.doi %}
+                                <a href="https://doi.org/{{ publication.doi }}" target="_blank" class="link link-primary">
+                                    {{ publication.doi }}
+                                </a>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+
+        {% if publication.abstract %}
+
+            <div class="card bg-base-100 shadow border border-base-300">
+                <div class="card-body">
+
+                    <h2 class="card-title">
+                        Abstract
+                    </h2>
+
+                    <p class="text-sm leading-relaxed text-base-content/80">
+                        {{ publication.abstract }}
+                    </p>
+
+                </div>
+            </div>
+
+        {% endif %}
+
+
+        <div class="grid md:grid-cols-2 gap-6">
+
+            <div class="card bg-base-100 shadow border border-base-300">
+                <div class="card-body">
+
+                    <h2 class="card-title">
+                        Authors
+                    </h2>
+
+                    <ul class="space-y-1.5">
+
+                        {% for author in publication.authors.all %}
+
+                            <li class="flex items-center gap-2 text-sm">
+                                <span class="font-medium">{{ author.first_name }} {{ author.last_name }}</span>
+
+                                {% if author.rri_role %}
+                                    <span class="badge badge-ghost badge-sm">
+                                        {{ author.rri_role }}
+                                    </span>
+                                {% endif %}
+                            </li>
+
+                        {% empty %}
+
+                            <li class="text-sm text-base-content/50">
+                                No authors available
+                            </li>
+
+                        {% endfor %}
+
+                    </ul>
+
+                </div>
+            </div>
+
+            <div class="card bg-base-100 shadow border border-base-300">
+                <div class="card-body">
+
+                    <h2 class="card-title">
+                        Departments
+                    </h2>
+
+                    <div class="flex flex-wrap gap-2">
+
+                        {% for dept in publication.departments.all %}
+
+                            <span class="badge badge-primary badge-outline">
+                                {{ dept.name }}
+                            </span>
+
+                        {% empty %}
+
+                            <span class="text-sm text-base-content/50">
+                                No departments available
+                            </span>
+
+                        {% endfor %}
+
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+
+        <div class="card bg-base-100 shadow border border-base-300">
+            <div class="card-body">
+
+                <h2 class="card-title">
+                    Affiliations
+                </h2>
+
+                <ul class="space-y-1 text-sm">
+
+                    {% for item in affiliations %}
+
+                        <li>
+                            <span class="font-medium">{{ item.author.first_name }} {{ item.author.last_name }}</span>
+                            <span class="text-base-content/50">— {{ item.affiliation.name }}</span>
+                        </li>
+
+                    {% empty %}
+
+                        <li class="text-base-content/50">
+                            No affiliations available
+                        </li>
+
+                    {% endfor %}
+
+                </ul>
+
+            </div>
+        </div>
+
+
+        {% if publication.full_text_url or publication.citation %}
+
+            <div class="card bg-base-100 shadow border border-base-300">
+
+                <div class="card-body">
+
+                    <h2 class="card-title">
+                        Links
+                    </h2>
+
+                    <div class="flex flex-wrap gap-3">
+
+                        {% if publication.full_text_url %}
+                            <a href="{{ publication.full_text_url }}"
+                               target="_blank"
+                               class="btn btn-primary">
+                                Open Full Text
+                            </a>
+                        {% endif %}
+
+                        {% if publication.citation %}
+                            <a href="{{ publication.citation }}"
+                               target="_blank"
+                               class="btn btn-outline btn-primary">
+                                View Citation
+                            </a>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        {% endif %}
+
+
+    </div>
+
 {% endblock %}
