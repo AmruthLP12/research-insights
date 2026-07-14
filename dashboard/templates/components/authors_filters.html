@@ -1,0 +1,210 @@
+<div class="card bg-base-100 shadow border border-base-300">
+
+    <div class="card-body">
+
+        <form method="get">
+
+            <div class="flex items-center justify-between mb-4">
+
+                <h2 class="card-title text-base">
+                    Filters
+                </h2>
+
+
+                {% if request.GET %}
+                    <span class="badge badge-primary badge-outline">
+                        Active
+                    </span>
+                {% endif %}
+
+            </div>
+
+
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+
+
+                <!-- Search -->
+
+                <div class="form-control">
+
+                    <label class="label py-1">
+                        <span class="label-text">
+                            Search Author
+                        </span>
+                    </label>
+
+
+                    <input
+                        type="text"
+                        name="search"
+                        value="{{ request.GET.search }}"
+                        placeholder="Name..."
+                        class="input input-bordered w-full"
+                    >
+
+                </div>
+
+
+
+                <!-- Publications Greater -->
+
+                <div class="form-control">
+
+                    <label class="label py-1">
+                        <span class="label-text">
+                            Publications >
+                        </span>
+                    </label>
+
+
+                    <input
+                        type="number"
+                        name="total_publications_gt"
+                        value="{{ request.GET.total_publications_gt }}"
+                        placeholder="Example: 5"
+                        class="input input-bordered w-full"
+                    >
+
+                </div>
+
+
+
+                <!-- Publications Less -->
+
+                <div class="form-control">
+
+                    <label class="label py-1">
+                        <span class="label-text">
+                            Publications <
+                        </span>
+                    </label>
+
+
+                    <input
+                        type="number"
+                        name="total_publications_lt"
+                        value="{{ request.GET.total_publications_lt }}"
+                        placeholder="Example: 10"
+                        class="input input-bordered w-full"
+                    >
+
+                </div>
+
+
+
+                <!-- Impact Greater -->
+
+                <div class="form-control">
+
+                    <label class="label py-1">
+                        <span class="label-text">
+                            Impact Factor >
+                        </span>
+                    </label>
+
+
+                    <input
+                        type="number"
+                        step="0.01"
+                        name="total_impact_factor_gt"
+                        value="{{ request.GET.total_impact_factor_gt }}"
+                        placeholder="Example: 5"
+                        class="input input-bordered w-full"
+                    >
+
+                </div>
+
+
+
+                <!-- Sort -->
+
+                <div class="form-control">
+
+                    <label class="label py-1">
+                        <span class="label-text">
+                            Sort
+                        </span>
+                    </label>
+
+
+                    <select
+                        name="ordering"
+                        class="select select-bordered w-full"
+                    >
+
+                        <option value="">
+                            Default
+                        </option>
+
+
+                        <option
+                            value="total_publications"
+                            {% if request.GET.ordering == "total_publications" %}
+                                selected
+                            {% endif %}
+                        >
+                            Publications ↑
+                        </option>
+
+
+                        <option
+                            value="-total_publications"
+                            {% if request.GET.ordering == "-total_publications" %}
+                                selected
+                            {% endif %}
+                        >
+                            Publications ↓
+                        </option>
+
+
+                        <option
+                            value="total_impact_factor"
+                            {% if request.GET.ordering == "total_impact_factor" %}
+                                selected
+                            {% endif %}
+                        >
+                            Impact ↑
+                        </option>
+
+
+                        <option
+                            value="-total_impact_factor"
+                            {% if request.GET.ordering == "-total_impact_factor" %}
+                                selected
+                            {% endif %}
+                        >
+                            Impact ↓
+                        </option>
+
+
+                    </select>
+
+                </div>
+
+
+            </div>
+
+
+
+            <div class="mt-6 flex gap-2">
+
+
+                <button class="btn btn-info">
+                    Apply Filters
+                </button>
+
+
+                <a href="." class="btn btn-ghost">
+                    Reset
+                </a>
+
+
+            </div>
+
+
+        </form>
+
+    </div>
+
+</div>

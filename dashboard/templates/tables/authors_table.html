@@ -1,0 +1,88 @@
+<div class="card bg-base-100 shadow border border-base-300">
+
+    <div class="card-body">
+
+        <div class="flex justify-between items-center">
+
+            <div>
+                <h2 class="card-title">Authors List</h2>
+                <p class="text-sm text-base-content/60">
+                    Showing
+                    {{ page_obj.start_index }} -
+                    {{ page_obj.end_index }}
+                    of
+                    {{ page_obj.paginator.count }}
+                    authors
+                </p>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto mt-6">
+
+            <table class="table table-zebra table-pin-rows">
+
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Author</th>
+                        <th>RRI Role</th>
+                        <th>Affiliation</th>
+                        <th class="text-center">Publications</th>
+                        <th class="text-center">Total Impact Factor</th>
+                        <th class="text-center">Average Impact Factor</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for author in page_obj %}
+                        <tr>
+                            <td>
+                                {{ page_obj.start_index|add:forloop.counter0 }}
+                            </td>
+                            <td class="font-medium">
+                                {{ author.first_name }} {{ author.last_name }}
+                            </td>
+                            <td>
+                                {{ author.rri_role }}
+                            </td>
+                            <td>
+                                <div class="tooltip tooltip-left"
+                                     data-tip="{{ author.affiliations|join:', ' }}">
+                                    <span class="badge badge-info badge-outline">
+                                        {{ author.affiliation_count }}
+                                        affiliation{{ author.affiliation_count|pluralize }}
+                                    </span>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-info badge-outline">
+                                    {{ author.total_publications }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {{ author.total_impact_factor|default:0|floatformat:2 }}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-success">
+                                    {{ author.average_impact_factor|default:0|floatformat:2 }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-8">
+                                {% include "components/empty_state.html" with title="No authors found" description="Try adjusting your filters or search terms." %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {% include "components/pagination.html" with object_name="authors" %}
+
+    </div>
+
+</div>

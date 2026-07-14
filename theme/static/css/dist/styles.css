@@ -1618,6 +1618,20 @@
   .inset-0 {
     inset: 0;
   }
+  @layer daisyui.l1.l2 {
+    .tooltip-left > .tooltip-content, .tooltip-left[data-tip]:before {
+      transform: translateX(calc(var(--tt-pos, 0.25rem) - 0.25rem)) translateY(var(--tt-trans, -50%));
+      left: auto;
+      right: var(--tt-off);
+      inset-block: var(--tt-inset, 50% auto);
+    }
+    .tooltip-left:after {
+      transform: translateX(var(--tt-pos, 0.25rem)) translateY(var(--tt-trans, -50%)) rotate(-90deg);
+      left: auto;
+      right: calc(var(--tt-tail) + 1px);
+      inset-block: var(--tt-tail-inset, 50% auto);
+    }
+  }
   .inset-y-0 {
     inset-block: 0;
   }
@@ -1626,6 +1640,9 @@
   }
   .top-1\/2 {
     top: calc(1 / 2 * 100%);
+  }
+  .top-17 {
+    top: calc(var(--spacing) * 17);
   }
   .top-\[68px\] {
     top: 68px;
@@ -2432,6 +2449,9 @@
   .h-4 {
     height: calc(var(--spacing) * 4);
   }
+  .h-4\.5 {
+    height: calc(var(--spacing) * 4.5);
+  }
   .h-5 {
     height: calc(var(--spacing) * 5);
   }
@@ -2471,11 +2491,17 @@
   .min-h-screen {
     min-height: 100vh;
   }
+  .w-0\.75 {
+    width: calc(var(--spacing) * 0.75);
+  }
   .w-3\.5 {
     width: calc(var(--spacing) * 3.5);
   }
   .w-4 {
     width: calc(var(--spacing) * 4);
+  }
+  .w-4\.5 {
+    width: calc(var(--spacing) * 4.5);
   }
   .w-5 {
     width: calc(var(--spacing) * 5);
@@ -3480,6 +3506,11 @@
   @media (width >= 64rem) {
     .lg\:hidden {
       display: none;
+    }
+  }
+  @media (width >= 64rem) {
+    .lg\:w-19 {
+      width: calc(var(--spacing) * 19);
     }
   }
   @media (width >= 64rem) {

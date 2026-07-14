@@ -40,7 +40,7 @@ class DynamicFilter(django_filters.FilterSet):
     def __init__(self, data=None, queryset=None, *, view=None, **kwargs):
         dynamic_filters = {}
 
-        exact_filters = getattr(view, "exact_filters", []) 
+        exact_filters = getattr(view, "exact_filters", [])
         gt_filters = getattr(view, "gt_filters", [])
         lt_filters = getattr(view, "lt_filters", [])
         sortable_fields = getattr(view, "sortable_columns", [])
@@ -48,7 +48,10 @@ class DynamicFilter(django_filters.FilterSet):
 
         # ── Fields that become dropdowns ──
         for field in exact_filters:
-            model_field = queryset.model._meta.get_field(field)
+            try:
+                model_field = queryset.model._meta.get_field(field)
+            except Exception:
+                continue
 
             # Skip fields without choices
             if not getattr(model_field, "choices", None):
@@ -111,7 +114,6 @@ class DynamicFilter(django_filters.FilterSet):
             )
 
         for field in date_filters:
-
             dynamic_filters[f"{field}_from"] = django_filters.DateFilter(
                 field_name=field,
                 lookup_expr="gte",
@@ -144,15 +146,16 @@ class DynamicFilter(django_filters.FilterSet):
         self.search_fields = getattr(view, "search_fields", [])
 
     def search_filter(self, qs, name, value):
+
         if not value:
             return qs
 
         q = Q()
+
         for field in self.search_fields:
             q |= Q(**{f"{field}__icontains": value})
 
-        return qs.filter(q)
-
+        return qs.filter(q).distinct()
 
 
 class ImpactFilter(django_filters.FilterSet):
@@ -175,26 +178,21 @@ class ImpactFilter(django_filters.FilterSet):
             | Q(doi__icontains=value)
         )
 
+
 class PublicationFilter(django_filters.FilterSet):
     date_from = django_filters.DateFilter(
-        field_name="date_published",
-        lookup_expr="gte",
-        label="From"
+        field_name="date_published", lookup_expr="gte", label="From"
     )
     date_to = django_filters.DateFilter(
-        field_name="date_published",
-        lookup_expr="lte",
-        label="To"
+        field_name="date_published", lookup_expr="lte", label="To"
     )
 
     document_type = django_filters.MultipleChoiceFilter(
-        choices=Publication.DOC_TYPE_CHOICES, 
-        label="Document Type"
+        choices=Publication.DOC_TYPE_CHOICES, label="Document Type"
     )
 
     department = django_filters.ModelMultipleChoiceFilter(
-        queryset=Department.objects.all(),
-        label="Department"
+        queryset=Department.objects.all(), label="Department"
     )
 
     rri_role = django_filters.MultipleChoiceFilter(
@@ -204,12 +202,11 @@ class PublicationFilter(django_filters.FilterSet):
             ("Student", "Student"),
             ("External", "External"),
         ],
-        label="RRI Role"
+        label="RRI Role",
     )
 
     year = django_filters.NumberFilter(
-        field_name="date_published__year",
-        label="Publication Year"
+        field_name="date_published__year", label="Publication Year"
     )
 
     class Meta:

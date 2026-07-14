@@ -1,124 +1,171 @@
 {% extends "base.html" %}
-{% load static %}
 
 {% block content %}
 
     <div class="space-y-8">
 
-    <!-- Header -->
-        <div>
-            <h1 class="text-3xl font-bold">
-                Collaboration Analysis
-            </h1>
+        <div class="space-y-6">
 
-            <p class="text-base-content/60 mt-2">
-                Analyze publication collaboration distribution across collaboration types.
-            </p>
-        </div>
+            {% include "components/page_header.html" with icon="🤝" title="Collaboration Analysis" subtitle="Publication collaboration distribution and impact analysis." %}
 
-    <!-- Stats -->
-        <div class="stats stats-vertical lg:stats-horizontal shadow border border-base-300 w-full bg-base-100">
-
-            <div class="stat">
-                <div class="stat-title">Collaboration Types</div>
-                <div class="stat-value text-primary">
-                    {{ collaboration_summary|length }}
-                </div>
-            </div>
-
-            <div class="stat">
-                <div class="stat-title">Total Publications</div>
-                <div class="stat-value text-secondary">
-                    {{ collaboration_total_publications }}
-                </div>
-            </div>
-
-            <div class="stat">
-                <div class="stat-title">Most Common Type</div>
-                <div class="stat-value text-accent text-2xl">
-                    {{ collaboration_top_type|default:"—" }}
-                </div>
-            </div>
-
-            <div class="stat">
-                <div class="stat-title">Largest Share</div>
-                <div class="stat-value text-info">
-                    {{ collaboration_top_count }}
-                </div>
-                <div class="stat-desc">
-                    Publications
-                </div>
-            </div>
+            {% include "components/filter_bar.html" %}
 
         </div>
 
-    <!-- Chart -->
-        <div class="card bg-base-100 shadow border border-base-300">
 
-            <div class="card-body">
+    <!-- KPI -->
 
-                <h2 class="card-title">
-                    Publications by Collaboration Type
-                </h2>
+        <div class="stats stats-vertical md:stats-horizontal shadow border border-base-300 w-full bg-base-100">
 
-                <canvas id="collaborationChart" height="120"></canvas>
+            {% include "components/stats_cards.html" with title="Collaboration Types" value=collaboration_type_count color="text-primary" %}
 
-            </div>
+            {% include "components/stats_cards.html" with title="Publications" value=collaboration_total_publications color="text-secondary" %}
+
+            {% include "components/stats_cards.html" with title="Average Impact" value=collaboration_average_impact|floatformat:2 color="text-accent" %}
+
+            {% include "components/stats_cards.html" with title="Highest Impact" value=collaboration_highest_impact|floatformat:2 color="text-success" %}
 
         </div>
+
+
+    <!-- Charts -->
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            {% include "components/chart_card.html" with title="Publications by Collaboration Type" id="collaborationBarChart" %}
+
+            {% include "components/chart_card.html" with title="Distribution" id="collaborationPieChart" %}
+
+        </div>
+
 
     <!-- Table -->
+
         <div class="card bg-base-100 shadow border border-base-300">
 
             <div class="card-body">
 
-                <div class="flex justify-between items-center">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
 
-                    <h2 class="card-title">
-                        Collaboration Summary
-                    </h2>
+                    <div>
 
-                    <div class="badge badge-primary">
-                        {{ collaboration_summary|length }} Types
+                        <h2 class="card-title">
+
+                            Collaboration Summary
+
+                        </h2>
+
+                        <p class="text-sm text-base-content/60">
+
+                            Showing
+
+                            {{ page_obj.start_index }}
+
+                            -
+
+                            {{ page_obj.end_index }}
+
+                            of
+
+                            {{ page_obj.paginator.count }}
+
+                            collaboration types
+
+                        </p>
+
                     </div>
+
+                    <span class="badge badge-primary badge-outline badge-lg">
+
+                        {{ page_obj.paginator.count }}
+
+                        Types
+
+                    </span>
 
                 </div>
 
-                <div class="overflow-x-auto mt-4">
 
-                    <table class="table table-zebra">
+                <div class="overflow-x-auto">
+
+                    <table class="table table-zebra table-pin-rows">
 
                         <thead>
+
                             <tr>
+
                                 <th>#</th>
+
                                 <th>Collaboration Type</th>
-                                <th class="text-center">Publications</th>
-                                <th class="text-center">% Share</th>
+
+                                <th class="text-center">
+                                    Publications
+                                </th>
+
+                                <th class="text-center">
+                                    Total IF
+                                </th>
+
+                                <th class="text-center">
+                                    Average IF
+                                </th>
+
+                                <th class="text-center">
+                                    Share
+                                </th>
+
                             </tr>
+
                         </thead>
 
                         <tbody>
 
-                            {% for row in collaboration_summary %}
+                            {% for row in page_obj %}
 
                                 <tr>
 
-                                    <td>{{ forloop.counter }}</td>
+                                    <td>
+
+                                        {{ page_obj.start_index|add:forloop.counter0 }}
+
+                                    </td>
 
                                     <td>
-                                        <span class="font-medium">
-                                            {{ row.collaboration_type }}
-                                        </span>
+
+                                        {{ row.collaboration_type }}
+
                                     </td>
 
                                     <td class="text-center">
+
                                         <span class="badge badge-primary badge-outline">
-                                            {{ row.total }}
+
+                                            {{ row.total_publications }}
+
                                         </span>
+
                                     </td>
 
                                     <td class="text-center">
-                                        {% widthratio row.total collaboration_total_publications 100 %}%
+
+                                        {{ row.total_impact_factor|default:0|floatformat:2 }}
+
+                                    </td>
+
+                                    <td class="text-center">
+
+                                        <span class="badge badge-success badge-outline">
+
+                                            {{ row.average_impact_factor|default:0|floatformat:2 }}
+
+                                        </span>
+
+                                    </td>
+
+                                    <td class="text-center">
+
+                                        {% widthratio row.total_publications collaboration_total_publications 100 %}%
+
                                     </td>
 
                                 </tr>
@@ -126,9 +173,16 @@
                             {% empty %}
 
                                 <tr>
-                                    <td colspan="4" class="text-center py-10 text-base-content/50">
-                                        No collaboration data available.
+
+                                    <td colspan="6">
+
+                                        {% include "components/empty_state.html" with
+                                        title="No collaboration data found"
+                                        description="Try changing your filters."
+                                        %}
+
                                     </td>
+
                                 </tr>
 
                             {% endfor %}
@@ -139,51 +193,97 @@
 
                 </div>
 
+                {% include "components/pagination.html" with object_name="collaboration types" %}
+
             </div>
 
         </div>
 
     </div>
 
-    {{ collaboration_chart_data|json_script:"collaboration-chart-data" }}
+
+    {{ collaboration_types_data|json_script:"collaboration-data" }}
 
     <script>
 
-        const collaborationData = JSON.parse(
-            document.getElementById("collaboration-chart-data").textContent
-        );
+        document.addEventListener("DOMContentLoaded", () => {
 
-        new Chart(document.getElementById("collaborationChart"), {
+            const data = JSON.parse(
+                document.getElementById("collaboration-data").textContent
+            );
 
-            type: "doughnut",
+            if (!data.length) return;
 
-            data: {
+            const labels = data.map(x => x.collaboration_type);
 
-                labels: collaborationData.map(item => item.collaboration_type),
+            const totals = data.map(x => x.total_publications);
 
-                datasets: [{
+            const colors = [
+                "#4f46e5",
+                "#06b6d4",
+                "#22c55e",
+                "#f59e0b",
+                "#ef4444",
+                "#8b5cf6",
+                "#ec4899",
+                "#14b8a6",
+                "#84cc16",
+                "#6366f1"
+            ];
 
-                    data: collaborationData.map(item => item.total)
-
-                }]
-
-            },
-
-            options: {
-
-                responsive: true,
-
-                plugins: {
-
-                    legend: {
-
-                        position: "bottom"
-
+            new Chart(
+                document.getElementById("collaborationBarChart"),
+                {
+                    type: "bar",
+                    data: {
+                        labels,
+                        datasets: [{
+                            data: totals,
+                            backgroundColor: "#4f46e5",
+                            borderRadius: 8,
+                            maxBarThickness: 45
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins:{
+                            legend:{
+                                display:false
+                            }
+                        },
+                        scales:{
+                            y:{
+                                beginAtZero:true
+                            }
+                        }
                     }
-
                 }
+            );
 
-            }
+
+            new Chart(
+                document.getElementById("collaborationPieChart"),
+                {
+                    type:"doughnut",
+                    data:{
+                        labels,
+                        datasets:[{
+                            data:totals,
+                            backgroundColor:colors
+                        }]
+                    },
+                    options:{
+                        responsive:true,
+                        maintainAspectRatio:false,
+                        plugins:{
+                            legend:{
+                                position:"bottom"
+                            }
+                        }
+                    }
+                }
+            );
 
         });
 

@@ -46,12 +46,6 @@ def dashboard_sidebar(request):
                         "url_name": "collaboration",
                         "icon": "handshake",
                     },
-                    {
-                        "title": "Collaboration Types",
-                        "url": reverse("dashboard:collaboration_types"),
-                        "url_name": "collaboration_types",
-                        "icon": "network",
-                    },
                 ],
             },
             {
