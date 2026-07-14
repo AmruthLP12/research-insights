@@ -5,8 +5,8 @@ app_name = "publications"
 
 urlpatterns = [
     # 📄 Publications list (MAIN PAGE)
-    path("", views.publications_list, name="list"),
-    path("<int:pk>/", views.PublicationDetailView.as_view(), name="publication_detail1"),
+    path("", views.PublicationsListView.as_view(), name="list"),
+    path("<int:pk>/", views.PublicationDetailView.as_view(), name="publication_detail"),
 
     # ⬆ Web of Science workflow
     path("wos/upload/", views.wos_upload, name="wos_upload"),

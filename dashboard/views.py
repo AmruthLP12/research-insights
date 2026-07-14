@@ -489,37 +489,293 @@ class AuthorsView(TemplateView):
 # =====================================================
 # JOURNALS
 # =====================================================
-def journals_view(request):
-    table = (
-        Publication.objects.values(
-            "journal__name",
-            "journal__impact_factor",
-        )
-        .annotate(
-            total=Count("id", distinct=True),
-            avg_if=Avg("journal__impact_factor"),
-            total_impact_factor=Sum("journal__impact_factor"),
-        )
-        .order_by("-total")
-    )
+class JournalsView(TemplateView):
+    template_name = "dashboard/journals.html"
 
-    return render(request, "dashboard/journals.html", {"journals": table})
+    paginate_by = 10
+
+    search_fields = [
+        "journal__name",
+        "title",
+        "doi",
+    ]
+
+    exact_filters = [
+        "document_type",
+        "collaboration_type",
+    ]
+
+    date_filters = [
+        "date_published",
+    ]
+
+    sortable_columns = [
+        "date_published",
+        "journal__impact_factor",
+    ]
+
+    gt_filters = []
+
+    lt_filters = []
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        # --------------------------------------------------
+        # Publications
+        # --------------------------------------------------
+
+        publications = Publication.objects.select_related("journal")
+
+        # --------------------------------------------------
+        # Filters
+        # --------------------------------------------------
+
+        filterset = DynamicFilter(
+            self.request.GET,
+            queryset=publications,
+            view=self,
+        )
+
+        publications = filterset.qs
+
+        # --------------------------------------------------
+        # Journal Aggregation
+        # --------------------------------------------------
+
+        journals = (
+            publications.values(
+                "journal__id",
+                "journal__name",
+                "journal__impact_factor",
+            )
+            .annotate(
+                total_publications=Count(
+                    "id",
+                    distinct=True,
+                ),
+                average_impact_factor=Avg(
+                    "journal__impact_factor",
+                ),
+                total_impact_factor=Sum(
+                    "journal__impact_factor",
+                ),
+            )
+            .order_by("-total_publications")
+        )
+
+        journals_data = list(journals)
+
+        # --------------------------------------------------
+        # Pagination
+        # --------------------------------------------------
+
+        paginator = Paginator(journals_data, self.paginate_by)
+
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        # --------------------------------------------------
+        # Summary Cards
+        # --------------------------------------------------
+
+        summary = publications.aggregate(
+            total_publications=Count("id"),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        # --------------------------------------------------
+        # Top Journal
+        # --------------------------------------------------
+
+        top_journal = journals_data[0] if journals_data else None
+
+        context.update(
+            {
+                # Filters
+                "filter": filterset,
+                # Table
+                "page_obj": page_obj,
+                # Charts
+                "journals_data": journals_data,
+                "journal_chart_data": journals_data,
+                # KPI Cards
+                "journal_count": (page_obj.paginator.count),
+                "journal_total_publications": (summary["total_publications"] or 0),
+                "journal_total_impact": (summary["total_impact_factor"] or 0),
+                "journal_average_impact": (summary["average_impact_factor"] or 0),
+                "journal_highest_impact": (summary["highest_impact_factor"] or 0),
+                # Top Journal
+                "journal_top_name": (
+                    top_journal["journal__name"] if top_journal else None
+                ),
+                "journal_top_count": (
+                    top_journal["total_publications"] if top_journal else 0
+                ),
+                # Header
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Journal Overview",
+                    },
+                ],
+            }
+        )
+
+        return context
 
 
 # =====================================================
 # DEPARTMENTS
 # =====================================================
-def departments_view(request):
-    table = (
-        Publication.objects.values("departments__name")
-        .annotate(
-            total=Count("id", distinct=True),
-            dept_avg_if=Avg("journal__impact_factor"),
-            dept_total_impact_factor=Sum("journal__impact_factor"),
+class DepartmentsView(TemplateView):
+    template_name = "dashboard/departments.html"
+
+    paginate_by = 10
+
+    search_fields = [
+        "departments__name",
+        "title",
+        "journal__name",
+        "doi",
+    ]
+
+    exact_filters = [
+        "document_type",
+        "collaboration_type",
+    ]
+
+    date_filters = [
+        "date_published",
+    ]
+
+    sortable_columns = [
+        "date_published",
+    ]
+
+    gt_filters = []
+
+    lt_filters = []
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        # --------------------------------------------------
+        # Publications
+        # --------------------------------------------------
+
+        publications = Publication.objects.select_related("journal").prefetch_related(
+            "departments"
         )
-        .order_by("-total")
-    )
-    return render(request, "dashboard/departments.html", {"table": table})
+
+        # --------------------------------------------------
+        # Filters
+        # --------------------------------------------------
+
+        filterset = DynamicFilter(
+            self.request.GET,
+            queryset=publications,
+            view=self,
+        )
+
+        publications = filterset.qs
+
+        # --------------------------------------------------
+        # Department Aggregation
+        # --------------------------------------------------
+
+        departments = (
+            publications.values(
+                "departments__id",
+                "departments__name",
+            )
+            .annotate(
+                total_publications=Count(
+                    "id",
+                    distinct=True,
+                ),
+                average_impact_factor=Avg(
+                    "journal__impact_factor",
+                ),
+                total_impact_factor=Sum(
+                    "journal__impact_factor",
+                ),
+            )
+            .order_by("-total_publications")
+        )
+
+        departments_data = list(departments)
+
+        # --------------------------------------------------
+        # Pagination
+        # --------------------------------------------------
+
+        paginator = Paginator(departments_data, self.paginate_by)
+
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        # --------------------------------------------------
+        # Summary Cards
+        # --------------------------------------------------
+
+        summary = publications.aggregate(
+            total_publications=Count(
+                "id",
+                distinct=True,
+            ),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        # --------------------------------------------------
+        # Top Department
+        # --------------------------------------------------
+
+        top_department = departments_data[0] if departments_data else None
+
+        context.update(
+            {
+                # Filters
+                "filter": filterset,
+                # Table
+                "page_obj": page_obj,
+                # Charts
+                "departments_data": departments_data,
+                "department_chart_data": departments_data,
+                # KPI Cards
+                "department_count": (page_obj.paginator.count),
+                "department_total_publications": (summary["total_publications"] or 0),
+                "department_total_impact": (summary["total_impact_factor"] or 0),
+                "department_average_impact": (summary["average_impact_factor"] or 0),
+                "department_highest_impact": (summary["highest_impact_factor"] or 0),
+                # Top Department
+                "department_top_name": (
+                    top_department["departments__name"] if top_department else None
+                ),
+                "department_top_count": (
+                    top_department["total_publications"] if top_department else 0
+                ),
+                # Header
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Department Overview",
+                    },
+                ],
+            }
+        )
+
+        return context
 
 
 # =====================================================
@@ -838,15 +1094,147 @@ class ImpactView(TemplateView):
 # =====================================================
 # RRI ROLE
 # =====================================================
-def rri_role_view(request):
-    table = (
-        Publication.objects.values("authors__rri_role")
-        .annotate(
-            total=Count("id", distinct=True),
-            avg_if=Avg("journal__impact_factor"),
-            total_impact_factor=Sum("journal__impact_factor"),
-        )
-        .order_by("-total")
-    )
+class RRIRoleView(TemplateView):
+    template_name = "dashboard/rri_role.html"
 
-    return render(request, "dashboard/rri_role.html", {"table": table})
+    paginate_by = 10
+
+    search_fields = [
+        "authors__first_name",
+        "authors__last_name",
+        "authors__rri_role",
+        "title",
+        "journal__name",
+        "doi",
+    ]
+
+    exact_filters = [
+        "document_type",
+        "collaboration_type",
+    ]
+
+    date_filters = [
+        "date_published",
+    ]
+
+    sortable_columns = [
+        "date_published",
+    ]
+
+    gt_filters = []
+
+    lt_filters = []
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        # --------------------------------------------------
+        # Publications
+        # --------------------------------------------------
+
+        publications = Publication.objects.select_related("journal").prefetch_related(
+            "authors"
+        )
+
+        # --------------------------------------------------
+        # Filters
+        # --------------------------------------------------
+
+        filterset = DynamicFilter(
+            self.request.GET,
+            queryset=publications,
+            view=self,
+        )
+
+        publications = filterset.qs
+
+        # --------------------------------------------------
+        # RRI Role Aggregation
+        # --------------------------------------------------
+
+        roles = (
+            publications.values(
+                "authors__rri_role",
+            )
+            .annotate(
+                total_publications=Count(
+                    "id",
+                    distinct=True,
+                ),
+                average_impact_factor=Avg(
+                    "journal__impact_factor",
+                ),
+                total_impact_factor=Sum(
+                    "journal__impact_factor",
+                ),
+            )
+            .order_by("-total_publications")
+        )
+
+        roles_data = list(roles)
+
+        # --------------------------------------------------
+        # Pagination
+        # --------------------------------------------------
+
+        paginator = Paginator(roles_data, self.paginate_by)
+
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        # --------------------------------------------------
+        # Summary Cards
+        # --------------------------------------------------
+
+        summary = publications.aggregate(
+            total_publications=Count(
+                "id",
+                distinct=True,
+            ),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        # --------------------------------------------------
+        # Top Role
+        # --------------------------------------------------
+
+        top_role = roles_data[0] if roles_data else None
+
+        context.update(
+            {
+                # Filter
+                "filter": filterset,
+                # Table
+                "page_obj": page_obj,
+                # Charts
+                "rri_roles_data": roles_data,
+                "rri_role_chart_data": roles_data,
+                # KPI
+                "rri_role_count": (page_obj.paginator.count),
+                "rri_role_total_publications": (summary["total_publications"] or 0),
+                "rri_role_total_impact": (summary["total_impact_factor"] or 0),
+                "rri_role_average_impact": (summary["average_impact_factor"] or 0),
+                "rri_role_highest_impact": (summary["highest_impact_factor"] or 0),
+                # Top Role
+                "rri_role_top_name": (
+                    top_role["authors__rri_role"] if top_role else None
+                ),
+                "rri_role_top_count": (
+                    top_role["total_publications"] if top_role else 0
+                ),
+                # Breadcrumb
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "RRI Role Overview",
+                    },
+                ],
+            }
+        )
+
+        return context

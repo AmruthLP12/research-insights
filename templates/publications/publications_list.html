@@ -1,69 +1,498 @@
 {% extends "base.html" %}
+
 {% block title %}Publications{% endblock %}
 
+
 {% block content %}
-  <div class="max-w-7xl mx-auto py-8">
 
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">
-        Publications
-      </h1>
 
-      <a href="{% url 'publications:wos_upload' %}"
-         class="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-        + Upload WoS File
-      </a>
+    <div class="space-y-8">
+    <!-- Header + Filters -->
+
+        <div class="space-y-6">
+
+
+            {% include "components/page_header.html" with icon="📚" title="Publications Analysis" subtitle="Publication records, trends and impact analysis." %}
+
+
+            <div class="flex justify-end">
+
+                <a href="{% url 'publications:wos_upload' %}"
+                   class="btn btn-primary">
+
+                    + Upload WoS File
+
+                </a>
+
+            </div>
+
+
+            {% include "components/filter_bar.html" %}
+
+
+        </div>
+    <!-- KPI -->
+
+        <div class="stats stats-vertical md:stats-horizontal shadow border border-base-300 w-full bg-base-100">
+
+
+            {% include "components/stats_cards.html" with title="Publications" value=publication_count color="text-primary" %}
+
+
+            {% include "components/stats_cards.html" with title="Total Impact" value=publication_total_impact|floatformat:2 color="text-secondary" %}
+
+
+            {% include "components/stats_cards.html" with title="Average Impact" value=publication_average_impact|floatformat:2 color="text-accent" %}
+
+
+            {% include "components/stats_cards.html" with title="Highest Impact" value=publication_highest_impact|floatformat:2 color="text-success" %}
+
+
+        </div>
+
+
+
+
+
+
+    <!-- Chart -->
+
+
+        <div class="grid grid-cols-1 gap-6">
+
+
+            {% include "components/chart_card.html" with title="Publication Trend" id="publicationTrendChart" %}
+
+
+        </div>
+    <!-- Publications Table -->
+
+
+        <div class="card bg-base-100 shadow border border-base-300">
+            <div class="card-body">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="card-title">
+                            Publication List
+                        </h2>
+                        <p class="text-sm text-base-content/60">
+                            Showing
+                            {{ page_obj.start_index }}
+                            -
+                            {{ page_obj.end_index }}
+                            of
+                            {{ page_obj.paginator.count }}
+                            publications
+                        </p>
+                    </div>
+                    <span class="badge badge-primary badge-outline badge-lg">
+
+                        {{ page_obj.paginator.count }}
+
+                        Records
+
+                    </span>
+
+
+                </div>
+
+
+
+
+
+
+
+                <div class="overflow-x-auto">
+
+
+                    <table class="table table-zebra table-pin-rows">
+
+
+                        <thead>
+
+
+                            <tr>
+
+
+                                <th>#</th>
+
+
+                                <th>
+                                    Title
+                                </th>
+
+
+                                <th>
+                                    Journal
+                                </th>
+
+
+                                <th>
+                                    Year
+                                </th>
+
+
+                                <th>
+                                    Document Type
+                                </th>
+
+
+                                <th>
+                                    Authors
+                                </th>
+
+
+                                <th>
+                                    Impact Factor
+                                </th>
+
+                                <th>
+                                    Action
+                                </th>
+                            </tr>
+
+
+                        </thead>
+
+
+
+
+
+                        <tbody>
+
+
+
+                            {% for p in page_obj %}
+
+
+
+                                <tr>
+
+
+
+                                    <td>
+
+                                        {{ page_obj.start_index|add:forloop.counter0 }}
+
+                                    </td>
+
+
+
+
+
+                                    <td class="max-w-xs">
+
+
+                                        <div class="font-medium">
+
+                                            {{ p.title }}
+
+                                        </div>
+
+
+                                    </td>
+
+
+
+
+
+
+                                    <td>
+
+
+                                        {{ p.journal.name|default:"—" }}
+
+
+                                    </td>
+
+
+
+
+
+
+                                    <td>
+
+
+                                        {{ p.date_published.year|default:"—" }}
+
+
+                                    </td>
+
+
+
+
+
+
+                                    <td>
+
+
+                                        <span >
+
+
+                                            {{ p.document_type|default:"—" }}
+
+
+                                        </span>
+
+
+                                    </td>
+                                    <td>
+
+
+                                        {% for a in p.authors.all %}
+
+
+                                            {{ a.first_name }} {{ a.last_name }}{% if not forloop.last %}, {% endif %}
+
+
+                                        {% empty %}
+
+
+                                            —
+
+
+                                        {% endfor %}
+
+
+                                    </td>
+
+
+
+
+
+
+
+                                    <td class="text-center">
+
+
+                                        {{ p.journal.impact_factor|default:0|floatformat:2 }}
+
+
+                                    </td>
+
+
+                                    <td class="text-center">
+
+                                        <a  href="{% url 'publications:publication_detail' p.id %}"
+
+                                           class="btn btn-sm btn-primary">
+                                            View
+                                        </a>
+
+                                    </td>
+
+
+
+                                </tr>
+
+
+
+
+                            {% empty %}
+
+
+
+                                <tr>
+
+
+                                    <td colspan="8">
+
+
+                                        {% include "components/empty_state.html" with title="No publications found" description="Try changing your filters." %}
+
+
+                                    </td>
+
+
+                                </tr>
+
+
+
+
+                            {% endfor %}
+
+
+
+
+                        </tbody>
+
+
+
+                    </table>
+
+
+
+                </div>
+
+
+
+
+
+
+                {% include "components/pagination.html" with object_name="publications" %}
+
+
+
+
+            </div>
+
+
+        </div>
+
+
+
+
+
     </div>
 
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-      <table class="min-w-full border-collapse">
-        <thead class="bg-gray-100">
-          <tr>
-            <th class="px-4 py-3 text-left text-sm font-semibold">Title</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold">Journal</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold">Year</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold">Document Type</th>
-            <th class="px-4 py-3 text-left text-sm font-semibold">Authors</th>
-          </tr>
-        </thead>
 
-        <tbody class="divide-y">
-          {% for p in publications %}
-            <tr class="hover:bg-gray-50">
-              <td class="px-4 py-3 text-sm text-gray-800">
-                {{ p.title }}
-              </td>
 
-              <td class="px-4 py-3 text-sm">
-                {{ p.journal.name|default:"—" }}
-              </td>
 
-              <td class="px-4 py-3 text-sm">
-                {{ p.date_published.year|default:"—" }}
-              </td>
 
-              <td class="px-4 py-3 text-sm">
-                {{ p.document_type|default:"—" }}
-              </td>
 
-              <td class="px-4 py-3 text-sm">
-                {% for a in p.authors.all %}
-                  {{ a.first_name }} {{ a.last_name }}{% if not forloop.last %}, {% endif %}
-                {% empty %}
-                  —
-                {% endfor %}
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="5" class="text-center py-6 text-gray-500">
-                No publications found.
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
 
-  </div>
+    {{ publication_trend_data|json_script:"publication-data" }}
+
+
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+
+
+    <script>
+
+
+        document.addEventListener("DOMContentLoaded", () => {
+
+
+            const data = JSON.parse(
+
+                document.getElementById("publication-data").textContent
+
+            );
+
+
+
+            if(!data.length) return;
+
+
+
+
+
+            const labels = data.map(
+
+                x => x.date_published__year
+
+            );
+
+
+
+            const totals = data.map(
+
+                x => x.total
+
+            );
+
+
+
+
+
+
+            new Chart(
+
+                document.getElementById("publicationTrendChart"),
+
+                {
+
+
+                    type:"line",
+
+
+                    data:{
+
+
+                        labels,
+
+
+                        datasets:[{
+
+
+                            label:"Publications",
+
+
+                            data:totals,
+
+
+                            borderWidth:3,
+
+
+                            tension:0.3
+
+
+                        }]
+
+
+                    },
+
+
+                    options:{
+
+
+                        responsive:true,
+
+
+                        maintainAspectRatio:false,
+
+
+                        plugins:{
+
+
+                            legend:{
+
+
+                                display:false
+
+
+                            }
+
+
+                        },
+
+
+                        scales:{
+
+
+                            y:{
+
+
+                                beginAtZero:true
+
+
+                            }
+
+
+                        }
+
+
+                    }
+
+
+
+                }
+
+
+            );
+
+
+
+        });
+
+
+    </script>
+
+
+
+
 {% endblock %}
