@@ -1,101 +1,99 @@
 {% extends "base.html" %}
+
 {% block content %}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <div class="space-y-8">
 
-    <div class="flex min-h-screen transition-colors duration-500" id="dashboard-root">
+        <!-- Header -->
+        <div class="space-y-6">
+            {% include "components/page_header.html" with icon="👥" title="Authors Overview" subtitle="Researcher productivity and impact" %}
+            {% include "components/authors_filters.html" %}
+        </div>
 
-    <!-- ================= MAIN ================= -->
-        <main class="flex-1 p-8">
+        <!-- Stats -->
+        <div class="stats stats-vertical lg:stats-horizontal shadow border border-base-300 w-full">
 
-        <!-- HEADER -->
-            <div class="flex justify-between items-center mb-12">
-                <h1 class="text-3xl font-bold" id="dashboard-title">
-                    Authors Overview
-                </h1>
-            </div>
+            {% include "components/stats_cards.html" with title="Authors" value=author_count color="text-info" %}
+            {% include "components/stats_cards.html" with title="Total Publications" value=author_total_publications color="text-success" %}
+            {% include "components/stats_cards.html" with title="Avg Impact Factor" value=author_average_impact|floatformat:2 color="text-warning" %}
+            {% include "components/stats_cards.html" with title="Highest Impact" value=author_highest_impact|floatformat:2 color="text-error" %}
 
-        <!-- ================= FILTER BAR ================= -->
-            <div class="bg-white p-6 rounded-xl shadow border border-gray-200 mb-10">
-                <div class="flex flex-col md:flex-row gap-4 md:items-center">
+        </div>
 
-                    <input type="date" id="from"
-                           class="border rounded-lg px-4 py-2">
+        <!-- Charts -->
+        <div class="grid xl:grid-cols-2 gap-6">
 
-                    <input type="date" id="to"
-                           class="border rounded-lg px-4 py-2">
+            {% include "components/chart_card.html" with title="Top Authors by Publications" id="authorsBarChart" %}
 
-                    <input type="text" id="pub-search"
-                           placeholder="Search publications..."
-                           class="border rounded-lg px-4 py-2 w-full md:w-64">
+            {% include "components/chart_card.html" with title="Top Authors by Impact Distribution" id="authorsPieChart" %}
 
-                    <button onclick="fetchData()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
-                        Apply
-                    </button>
+        </div>
 
-                </div>
-            </div>
-        <!-- ================= AUTHORS TABLE ================= -->
-            <div class="bg-white rounded-2xl p-6 shadow-sm">
-                <h2 class="text-2xl font-bold mb-6">Authors List</h2>
+        <!-- Authors Table -->
+        {% include "tables/authors_table.html" %}
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th class="p-3">Author</th>
-                                <th class="p-3">RRI Role</th>
-                                <th class="p-3 text-center">Affiliations</th>
-                                <th class="p-3 text-center">Publications</th>
-                                <th class="p-3 text-center">Total Impact Factor</th>
-                                <th class="p-3 text-center">Average Impact Factor</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in table %}
-                                <tr class="border-t border-gray-200 hover:bg-gray-50">
-                                    <td class="p-3">{{ row.authors__first_name }} {{ row.authors__last_name }}</td>
-                                    <td class="p-3">{{ row.authors__rri_role }}</td>
-                                    <td class="p-3 text-center">{{ row.authors__author_affiliations__affiliation__name }}</td>
-                                    <td class="p-3 text-center">{{ row.total }}</td>
-                                    <td class="p-3 text-center">{{ row.total_impact_factor }}</td>
-                                    <td class="p-3 text-center">{{ row.avg_impact_factor }}</td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="6" class="p-4 text-center text-gray-500">
-                                        No author data available
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        <!-- ================= COUNTER ANIMATION ================= -->
-            <script>
-                function animateCounters() {
-                    document.querySelectorAll('.counter').forEach(counter => {
-                        const target = +counter.dataset.value;
-                        let current = 0;
-                        const increment = target / 50;
-                        const update = () => {
-                            current += increment;
-                            if(current < target){
-                                counter.innerText = Math.floor(current);
-                                requestAnimationFrame(update);
-                            } else {
-                                counter.innerText = target;
-                            }
-                        };
-                        update();
-                    });
-                }
-                animateCounters();
-            </script>
-
-        </main>
     </div>
+
+    <!-- Pass data to JS -->
+    {{ authors_data|json_script:"authors-data" }}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const authorsData = JSON.parse(
+                document.getElementById("authors-data").textContent
+            );
+
+            if (!authorsData.length) return;
+
+            const top10 = authorsData.slice(0, 10);
+
+            const colors = [
+                "#3b82f6", "#10b981", "#f59e0b", "#ef4444",
+                "#8b5cf6", "#06b6d4", "#84cc16", "#ec4899",
+                "#6366f1", "#f97316"
+            ];
+
+            // Bar Chart - Top Authors by Publications
+            new Chart(document.getElementById("authorsBarChart"), {
+                type: "bar",
+                data: {
+                    labels: top10.map(x => `${x.authors__first_name} ${x.authors__last_name}`),
+                    datasets: [{
+                        label: "Publications",
+                        data: top10.map(x => x.total_publications),
+                        backgroundColor: "#3b82f6",
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+
+            // Pie Chart - Impact Distribution
+            new Chart(document.getElementById("authorsPieChart"), {
+                type: "doughnut",
+                data: {
+                    labels: top10.map(x => `${x.authors__first_name} ${x.authors__last_name}`),
+                    datasets: [{
+                        data: top10.map(x => x.total_impact_factor || 0),
+                        backgroundColor: colors
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        });
+    </script>
 
 {% endblock %}

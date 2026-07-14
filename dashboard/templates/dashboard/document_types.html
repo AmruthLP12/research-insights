@@ -1,134 +1,160 @@
 {% extends "base.html" %}
+
 {% block content %}
 
     <div class="space-y-8">
 
-    <!-- Header -->
-        <div>
-            <h1 class="text-3xl font-bold">
-                Document Types
-            </h1>
+    <!-- ================= Header ================= -->
 
-            <p class="text-base-content/60 mt-1">
-                Publication distribution across document categories.
-            </p>
-        </div>
+        <div class="space-y-6">
 
-    <!-- KPI Cards -->
-        <div class="stats shadow border border-base-300 w-full">
+            {% include "components/page_header.html" with icon="📄" title="Document Types" subtitle="Publication distribution across document categories." %}
 
-            <div class="stat">
-                <div class="stat-title">Document Types</div>
-                <div class="stat-value text-primary">
-                    {{ document_type_count }}
-                </div>
-            </div>
-
-            <div class="stat">
-                <div class="stat-title">Publications</div>
-                <div class="stat-value text-secondary">
-                    {{ document_total_publications }}
-                </div>
-            </div>
-
-            <div class="stat">
-                <div class="stat-title">Average Impact</div>
-                <div class="stat-value text-accent">
-                    {{ document_average_impact|floatformat:2 }}
-                </div>
-            </div>
-
-            <div class="stat">
-                <div class="stat-title">Highest Impact</div>
-                <div class="stat-value text-success">
-                    {{ document_highest_impact|floatformat:2 }}
-                </div>
-            </div>
+            {% include "components/filter_bar.html" %}
 
         </div>
 
-    <!-- Charts -->
-        <div class="grid lg:grid-cols-2 gap-6">
 
-            <div class="card bg-base-100 border border-base-300 shadow">
+    <!-- ================= KPI Cards ================= -->
 
-                <div class="card-body">
+        <div class="stats stats-vertical md:stats-horizontal shadow border border-base-300 w-full bg-base-100">
 
-                    <h2 class="card-title">
-                        Publications by Document Type
-                    </h2>
+            {% include "components/stats_cards.html" with title="Document Types" value=document_type_count color="text-primary" %}
 
-                    <canvas id="documentBarChart"></canvas>
+            {% include "components/stats_cards.html" with title="Publications" value=document_total_publications color="text-secondary" %}
 
-                </div>
+            {% include "components/stats_cards.html" with title="Average Impact" value=document_average_impact|floatformat:2 color="text-warning" %}
 
-            </div>
-
-            <div class="card bg-base-100 border border-base-300 shadow">
-
-                <div class="card-body">
-
-                    <h2 class="card-title">
-                        Distribution
-                    </h2>
-
-                    <canvas id="documentPieChart"></canvas>
-
-                </div>
-
-            </div>
+            {% include "components/stats_cards.html" with title="Highest Impact" value=document_highest_impact|floatformat:2 color="text-success" %}
 
         </div>
 
-    <!-- Table -->
+
+    <!-- ================= Charts ================= -->
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+            {% include "components/chart_card.html" with title="Publications by Document Type" id="documentBarChart" %}
+
+            {% include "components/chart_card.html" with title="Distribution" id="documentPieChart" %}
+
+        </div>
+
+
+    <!-- ================= Table ================= -->
+
         <div class="card bg-base-100 shadow border border-base-300">
 
             <div class="card-body">
 
-                <h2 class="card-title">
-                    Document Type Summary
-                </h2>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+
+                    <div>
+
+                        <h2 class="card-title">
+                            Document Type Summary
+                        </h2>
+
+                        <p class="text-sm text-base-content/60">
+
+                            Showing
+
+                            {{ page_obj.start_index }}
+
+                            -
+
+                            {{ page_obj.end_index }}
+
+                            of
+
+                            {{ page_obj.paginator.count }}
+
+                            document types
+
+                        </p>
+
+                    </div>
+
+                    <div class="badge badge-primary badge-outline badge-lg">
+
+                        {{ page_obj.paginator.count }}
+
+                        Types
+
+                    </div>
+
+                </div>
 
                 <div class="overflow-x-auto">
 
-                    <table class="table table-zebra">
+                    <table class="table table-zebra table-pin-rows">
 
                         <thead>
 
                             <tr>
+
                                 <th>#</th>
+
                                 <th>Document Type</th>
-                                <th class="text-center">Publications</th>
-                                <th class="text-center">Total IF</th>
-                                <th class="text-center">Average IF</th>
+
+                                <th class="text-center">
+                                    Publications
+                                </th>
+
+                                <th class="text-center">
+                                    Total Impact
+                                </th>
+
+                                <th class="text-center">
+                                    Average Impact
+                                </th>
+
                             </tr>
 
                         </thead>
 
                         <tbody>
 
-                            {% for row in document_types %}
+                            {% for row in page_obj %}
 
-                                <tr>
+                                <tr class="hover">
 
-                                    <td>{{ forloop.counter }}</td>
+                                    <td>
 
-                                    <td>{{ row.document_type }}</td>
+                                        {{ page_obj.start_index|add:forloop.counter0 }}
+
+                                    </td>
+
+                                    <td class="font-medium">
+
+                                        {{ row.document_type }}
+
+                                    </td>
 
                                     <td class="text-center">
+
                                         <span class="badge badge-primary badge-outline">
+
                                             {{ row.total_publications }}
+
                                         </span>
+
                                     </td>
 
-                                    <td class="text-center">
+                                    <td class="text-center font-medium">
+
                                         {{ row.total_impact_factor|default:0|floatformat:2 }}
+
                                     </td>
 
                                     <td class="text-center">
-                                        <span class="badge badge-success">
+
+                                        <span class="badge badge-success badge-outline">
+
                                             {{ row.average_impact_factor|default:0|floatformat:2 }}
+
                                         </span>
+
                                     </td>
 
                                 </tr>
@@ -136,9 +162,13 @@
                             {% empty %}
 
                                 <tr>
-                                    <td colspan="5" class="text-center py-8 text-base-content/60">
-                                        No document type data available.
+
+                                    <td colspan="5">
+
+                                        {% include "components/empty_state.html" with title="No document types found" description="Try changing your filters." %}
+
                                     </td>
+
                                 </tr>
 
                             {% endfor %}
@@ -149,62 +179,146 @@
 
                 </div>
 
+                {% include "components/pagination.html" with object_name="document types" %}
+
             </div>
 
         </div>
 
     </div>
 
+
     {{ document_types_data|json_script:"document-types-data" }}
 
     <script>
 
-        const documentData = JSON.parse(
-            document.getElementById("document-types-data").textContent
-        );
+        document.addEventListener("DOMContentLoaded", () => {
 
-// Top document types
-        const labels = documentData.map(item => item.document_type);
-        const totals = documentData.map(item => item.total_publications);
-        const avgImpact = documentData.map(item => item.average_impact_factor);
+            const documentData = JSON.parse(
+                document.getElementById("document-types-data").textContent
+            );
 
-// Publications Chart
-        new Chart(document.getElementById("documentBarChart"), {
-            type: "bar",
-            data: {
-                labels,
-                datasets: [{
-                    label: "Publications",
-                    data: totals,
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                }
+            if (!documentData.length) {
+                return;
             }
-        });
 
-// Distribution Chart
-        new Chart(document.getElementById("documentPieChart"), {
-            type: "doughnut",
-            data: {
-                labels,
-                datasets: [{
-                    data: totals,
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: "bottom"
+            const labels = documentData.map(item => item.document_type);
+
+            const totals = documentData.map(item => item.total_publications);
+
+            const palette = [
+                "#06b6d4",
+                "#8b5cf6",
+                "#4f46e5",
+                "#22c55e",
+                "#ef4444",
+                "#ec4899",
+                "#f59e0b",
+                "#0ea5e9",
+                "#84cc16",
+                "#6366f1",
+            ];
+
+            new Chart(document.getElementById("documentBarChart"), {
+
+                type: "bar",
+
+                data: {
+
+                    labels,
+
+                    datasets: [{
+
+                        label: "Publications",
+
+                        data: totals,
+
+                        backgroundColor: "#ef4444",
+
+                        borderRadius: 8,
+
+                        maxBarThickness: 45,
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    plugins: {
+
+                        legend: {
+
+                            display: false
+
+                        }
+
+                    },
+
+                    scales: {
+
+                        y: {
+
+                            beginAtZero: true,
+
+                            ticks: {
+
+                                precision: 0
+
+                            }
+
+                        }
+
                     }
+
                 }
-            }
+
+            });
+
+            new Chart(document.getElementById("documentPieChart"), {
+
+                type: "doughnut",
+
+                data: {
+
+                    labels,
+
+                    datasets: [{
+
+                        data: totals,
+
+                        backgroundColor: palette,
+
+                        borderWidth: 1,
+
+                    }]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio: false,
+
+                    plugins: {
+
+                        legend: {
+
+                            position: "bottom"
+
+                        }
+
+                    }
+
+                }
+
+            });
+
         });
 
     </script>
