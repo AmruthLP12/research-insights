@@ -77,8 +77,6 @@ class PublicationsListView(TemplateView):
 
     lt_filters = []
 
-    
-
     def get_context_data(self, **kwargs):
 
         context = super().get_context_data(**kwargs)
@@ -172,7 +170,6 @@ class PublicationsListView(TemplateView):
         return context
 
 
-
 class PublicationDetailView(DetailView):
     model = Publication
     template_name = "publications/publication_detail.html"
@@ -182,17 +179,20 @@ class PublicationDetailView(DetailView):
 
         publication = self.object
 
-        context.update({
-            "authors": publication.authors.all(),
-            "departments": publication.departments.all(),
-            "affiliations": publication.author_affiliations.select_related(
-                "author",
-                "affiliation",
-            ),
-            "citations": publication.yearly_citations.all(),
-        })
+        context.update(
+            {
+                "authors": publication.authors.all(),
+                "departments": publication.departments.all(),
+                "affiliations": publication.author_affiliations.select_related(
+                    "author",
+                    "affiliation",
+                ),
+                "citations": publication.yearly_citations.all(),
+            }
+        )
 
         return context
+
 
 # =====================================================
 # WOS UPLOAD
@@ -365,6 +365,3 @@ def wos_save(request):
 # =====================================================
 def wos_success(request):
     return render(request, "publications/wos_success.html")
-
-
-

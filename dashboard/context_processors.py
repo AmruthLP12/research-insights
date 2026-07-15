@@ -46,6 +46,18 @@ def dashboard_sidebar(request):
                         "url_name": "collaboration",
                         "icon": "handshake",
                     },
+                    {
+                        "title": "Country Collaboration",
+                        "url": reverse("dashboard:country_collaboration"),
+                        "url_name": "country_collaboration",
+                        "icon": "globe",
+                    },
+                    {
+                        "title": "Institution Collaboration",
+                        "url": reverse("dashboard:institution_collaboration"),
+                        "url_name": "institution_collaboration",                        
+                        "icon": "building",
+                    }
                 ],
             },
             {
@@ -76,6 +88,7 @@ def dashboard_sidebar(request):
                         "url_name": "rri_role",
                         "icon": "badge-check",
                     },
+                    
                 ],
             },
         ],
