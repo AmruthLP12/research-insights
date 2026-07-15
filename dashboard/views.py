@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.db.models import Count, Avg, Sum, Max, Prefetch
 from django.urls import reverse
 from dashboard.filters import DynamicFilter
@@ -486,6 +485,78 @@ class AuthorsView(TemplateView):
         return context
 
 
+class AuthorDetailView(TemplateView):
+    template_name = "dashboard/author_detail.html"
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        first_name = self.kwargs["first_name"]
+        last_name = self.kwargs["last_name"]
+
+        authors = Author.objects.filter(
+            first_name__iexact=first_name,
+            last_name__iexact=last_name,
+        ).prefetch_related(
+            "publications__journal",
+            "author_affiliations__affiliation",
+        )
+
+        publications = (
+            Publication.objects.filter(
+                authors__in=authors,
+            )
+            .select_related("journal")
+            .prefetch_related(
+                "authors",
+                "departments",
+            )
+            .distinct()
+        )
+
+        affiliations = AuthorAffiliation.objects.filter(
+            author__in=authors,
+        ).select_related(
+            "affiliation",
+            "publication",
+        )
+
+        total_publications = publications.count()
+
+        total_if = sum(p.journal.impact_factor or 0 for p in publications if p.journal)
+
+        avg_if = total_if / total_publications if total_publications else 0
+
+        context.update(
+            {
+                "first_name": first_name,
+                "last_name": last_name,
+                "authors": authors,
+                "publications": publications,
+                "affiliations": affiliations,
+                "total_publications": total_publications,
+                "total_impact_factor": total_if,
+                "average_impact_factor": avg_if,
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Authors",
+                        "url": reverse("dashboard:authors"),
+                    },
+                    {
+                        "label": f"{first_name} {last_name}",
+                    },
+                ],
+            }
+        )
+
+        return context
+
+
 # =====================================================
 # JOURNALS
 # =====================================================
@@ -887,41 +958,270 @@ class CollaborationView(TemplateView):
 # =====================================================
 # COUNTRY COLLABORATION
 # =====================================================
-def country_collaboration_view(request):
-    table = (
-        AuthorAffiliation.objects.values("country")
-        .annotate(publications=Count("publication", distinct=True))
-        .order_by("-publications")
-    )
+class CountryCollaborationView(TemplateView):
+    template_name = "dashboard/country_collaboration.html"
 
-    return render(
-        request,
-        "dashboard/collaboration.html",
-        {
-            "table": table,
-            "title": "Country-wise Collaboration",
-        },
-    )
+    paginate_by = 10
+
+    search_fields = [
+        "author_affiliations__affiliation__country",
+        "title",
+        "journal__name",
+        "doi",
+    ]
+
+    exact_filters = [
+        "document_type",
+        "collaboration_type",
+    ]
+
+    date_filters = [
+        "date_published",
+    ]
+
+    sortable_columns = [
+        "publications",
+    ]
+
+    gt_filters = []
+    lt_filters = []
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        publications = Publication.objects.select_related("journal").prefetch_related(
+            "author_affiliations__affiliation"
+        )
+
+        filterset = DynamicFilter(
+            self.request.GET,
+            queryset=publications,
+            view=self,
+        )
+
+        publications = filterset.qs
+
+        countries = (
+            publications.values("author_affiliations__affiliation__country")
+            .exclude(author_affiliations__affiliation__country__isnull=True)
+            .exclude(author_affiliations__affiliation__country="")
+            .annotate(
+                publications=Count("id", distinct=True),
+                total_impact_factor=Sum("journal__impact_factor"),
+                average_impact_factor=Avg("journal__impact_factor"),
+            )
+        )
+
+        merged = {}
+
+        for row in countries:
+            country = (row["author_affiliations__affiliation__country"] or "").strip()
+
+            # Remove trailing semicolons
+            country = country.rstrip(";").strip()
+
+            if country not in merged:
+                merged[country] = {
+                    "author_affiliations__affiliation__country": country,
+                    "publications": 0,
+                    "total_impact_factor": 0,
+                }
+
+            merged[country]["publications"] += row["publications"] or 0
+            merged[country]["total_impact_factor"] += row["total_impact_factor"] or 0
+
+        for row in merged.values():
+            if row["publications"]:
+                row["average_impact_factor"] = (
+                    row["total_impact_factor"] / row["publications"]
+                )
+            else:
+                row["average_impact_factor"] = 0
+
+        countries_data = sorted(
+            merged.values(),
+            key=lambda x: x["publications"],
+            reverse=True,
+        )
+        chart_data = countries_data[:10]
+
+        paginator = Paginator(countries_data, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        summary = publications.aggregate(
+            total_publications=Count("id"),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        top_country = countries_data[0] if countries_data else None
+
+        context.update(
+            {
+                "filter": filterset,
+                "page_obj": page_obj,
+                "countries_data": countries_data,
+                "country_chart_data": chart_data,
+                "country_count": page_obj.paginator.count,
+                "country_total_publications": summary["total_publications"] or 0,
+                "country_total_impact": summary["total_impact_factor"] or 0,
+                "country_average_impact": summary["average_impact_factor"] or 0,
+                "country_highest_impact": summary["highest_impact_factor"] or 0,
+                "country_top": (
+                    top_country["author_affiliations__affiliation__country"]
+                    if top_country
+                    else None
+                ),
+                "country_top_count": (
+                    top_country["publications"] if top_country else 0
+                ),
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Country Collaboration",
+                    },
+                ],
+            }
+        )
+
+        return context
 
 
 # =====================================================
 # INSTITUTION COLLABORATION
 # =====================================================
-def institution_collaboration_view(request):
-    table = (
-        AuthorAffiliation.objects.values("institution")
-        .annotate(publications=Count("publication", distinct=True))
-        .order_by("-publications")
-    )
+class InstitutionCollaborationView(TemplateView):
+    template_name = "dashboard/institution_collaboration.html"
 
-    return render(
-        request,
-        "dashboard/collaboration.html",
-        {
-            "table": table,
-            "title": "Institution-wise Collaboration",
-        },
-    )
+    paginate_by = 10
+
+    search_fields = [
+        "author_affiliations__affiliation__name",
+        "title",
+        "journal__name",
+        "doi",
+    ]
+
+    exact_filters = [
+        "document_type",
+        "collaboration_type",
+    ]
+
+    date_filters = [
+        "date_published",
+    ]
+
+    sortable_columns = [
+        "publications",
+    ]
+
+    gt_filters = []
+    lt_filters = []
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        publications = Publication.objects.select_related("journal").prefetch_related(
+            "author_affiliations__affiliation"
+        )
+
+        filterset = DynamicFilter(
+            self.request.GET,
+            queryset=publications,
+            view=self,
+        )
+
+        publications = filterset.qs
+
+        institutions = (
+            publications.values("author_affiliations__affiliation__name")
+            .exclude(author_affiliations__affiliation__name__isnull=True)
+            .exclude(author_affiliations__affiliation__name="")
+            .annotate(
+                publications=Count("id", distinct=True),
+                total_impact_factor=Sum("journal__impact_factor"),
+                average_impact_factor=Avg("journal__impact_factor"),
+            )
+        )
+
+        merged = {}
+
+        for row in institutions:
+            name = (row["author_affiliations__affiliation__name"] or "").strip()
+
+            if name not in merged:
+                merged[name] = {
+                    "author_affiliations__affiliation__name": name,
+                    "publications": 0,
+                    "total_impact_factor": 0,
+                }
+
+            merged[name]["publications"] += row["publications"] or 0
+            merged[name]["total_impact_factor"] += row["total_impact_factor"] or 0
+
+        for row in merged.values():
+            row["average_impact_factor"] = (
+                row["total_impact_factor"] / row["publications"]
+                if row["publications"]
+                else 0
+            )
+
+        institutions_data = sorted(
+            merged.values(),
+            key=lambda x: x["publications"],
+            reverse=True,
+        )
+
+        institution_chart_data = institutions_data[:10]
+
+        paginator = Paginator(institutions_data, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        summary = publications.aggregate(
+            total_publications=Count("id"),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        top_institution = institutions_data[0] if institutions_data else None
+
+        context.update(
+            {
+                "filter": filterset,
+                "page_obj": page_obj,
+                "institutions_data": institutions_data,
+                "institution_chart_data": institution_chart_data,
+                "institution_count": page_obj.paginator.count,
+                "institution_total_publications": summary["total_publications"] or 0,
+                "institution_total_impact": summary["total_impact_factor"] or 0,
+                "institution_average_impact": summary["average_impact_factor"] or 0,
+                "institution_highest_impact": summary["highest_impact_factor"] or 0,
+                "institution_top": (
+                    top_institution["author_affiliations__affiliation__name"]
+                    if top_institution
+                    else None
+                ),
+                "institution_top_count": (
+                    top_institution["publications"] if top_institution else 0
+                ),
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Institution Collaboration",
+                    },
+                ],
+            }
+        )
+
+        return context
 
 
 # =====================================================

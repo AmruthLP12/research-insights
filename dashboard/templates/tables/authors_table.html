@@ -30,6 +30,7 @@
                         <th class="text-center">Publications</th>
                         <th class="text-center">Total Impact Factor</th>
                         <th class="text-center">Average Impact Factor</th>
+                        <th class="text-center">Actions</th>
                     </tr>
                 </thead>
 
@@ -67,10 +68,17 @@
                                     {{ author.average_impact_factor|default:0|floatformat:2 }}
                                 </span>
                             </td>
+                            <td class="text-center">
+                                <a href="{% url 'dashboard:author_detail' author.first_name author.last_name %}"
+        class="btn btn-sm btn-primary btn-outline">
+                                    View
+                                </a>                                
+                            </td>
                         </tr>
+                        
                     {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center py-8">
+                            <td colspan="8" class="text-center py-8">
                                 {% include "components/empty_state.html" with title="No authors found" description="Try adjusting your filters or search terms." %}
                             </td>
                         </tr>
