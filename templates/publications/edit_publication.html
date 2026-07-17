@@ -1,32 +1,21 @@
 {% extends "base.html" %}
 {% load static %}
-
 {% block title %}Edit Publication{% endblock %}
-
 {% block content %}
-<h2 class="text-2xl font-semibold mb-4">Edit Publication</h2>
-
-<form method="post" class="space-y-6">
-    {% csrf_token %}
-
-    <div class="bg-white p-6 shadow rounded">
-        <h3 class="font-semibold text-lg mb-2">Publication Details</h3>
-        {{ form.as_p }}
-    </div>
-
-    <div class="bg-white p-6 shadow rounded">
-        <h3 class="font-semibold text-lg mb-2">Authors</h3>
-        {{ formset.management_form }}
-        {% for subform in formset %}
-            <div class="border p-4 mb-4 rounded">
-                {{ subform.as_p }}
-            </div>
-        {% endfor %}
-    </div>
-
-    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
-        Save Changes
-    </button>
-</form>
-
+    <h2 class="text-2xl font-semibold mb-4">Edit Publication</h2>
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+        <div class="bg-white p-6 shadow rounded">
+            <h3 class="font-semibold text-lg mb-2">Publication Details</h3>
+            {{ form.as_p }}
+        </div>
+        <div class="bg-white p-6 shadow rounded">
+            <h3 class="font-semibold text-lg mb-2">Authors</h3>
+            {{ formset.management_form }}
+            {% for subform in formset %}
+                <div class="border p-4 mb-4 rounded">{{ subform.as_p }}</div>
+            {% endfor %}
+        </div>
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save Changes</button>
+    </form>
 {% endblock %}
