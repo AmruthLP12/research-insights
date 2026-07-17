@@ -79,9 +79,6 @@
                                 <th>#</th>
                                 <th>Affiliation</th>
                                 <th>Country</th>
-                                <th>Publication</th>
-                                <th>Primary</th>
-
                             </tr>
 
                         </thead>
@@ -98,31 +95,7 @@
 
                                     <td>{{ item.affiliation.country|default:"—" }}</td>
 
-                                    <td>{{ item.affiliation.author.rri_role|default:"—" }}</td>
-
-                                    <td>
-                                        {% if item.publication %}
-                                            <a href="{% url 'publications:publication_detail' item.publication.pk %}" class="link link-primary">
-                                                {{ item.publication.title|truncatechars:50 }}
-                                            </a>
-                                        {% else %}
-                                            —
-                                        {% endif %}
-                                    </td>
-
-                                    <td>
-
-                                        {% if item.is_primary %}
-                                            <span class="badge badge-success">
-                                                Yes
-                                            </span>
-                                        {% else %}
-                                            <span class="badge badge-ghost">
-                                                No
-                                            </span>
-                                        {% endif %}
-
-                                    </td>
+                                    
 
                                 </tr>
 

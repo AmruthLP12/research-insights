@@ -1,42 +1,28 @@
 {% extends "base.html" %}
-
 {% block content %}
-
     <div class="space-y-8">
-
         <!-- Header -->
         <div class="space-y-6">
             {% include "components/page_header.html" with icon="👥" title="Authors Overview" subtitle="Researcher productivity and impact" %}
             {% include "components/authors_filters.html" %}
         </div>
-
         <!-- Stats -->
         <div class="stats stats-vertical lg:stats-horizontal shadow border border-base-300 w-full">
-
             {% include "components/stats_cards.html" with title="Authors" value=author_count color="text-info" %}
             {% include "components/stats_cards.html" with title="Total Publications" value=author_total_publications color="text-success" %}
             {% include "components/stats_cards.html" with title="Avg Impact Factor" value=author_average_impact|floatformat:2 color="text-warning" %}
             {% include "components/stats_cards.html" with title="Highest Impact" value=author_highest_impact|floatformat:2 color="text-error" %}
-
         </div>
-
         <!-- Charts -->
         <div class="grid xl:grid-cols-2 gap-6">
-
             {% include "components/chart_card.html" with title="Top Authors by Publications" id="authorsBarChart" %}
-
             {% include "components/chart_card.html" with title="Top Authors by Impact Distribution" id="authorsPieChart" %}
-
         </div>
-
         <!-- Authors Table -->
         {% include "tables/authors_table.html" %}
-
     </div>
-
     <!-- Pass data to JS -->
     {{ authors_data|json_script:"authors-data" }}
-
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             const authorsData = JSON.parse(
@@ -95,5 +81,4 @@
             });
         });
     </script>
-
 {% endblock %}

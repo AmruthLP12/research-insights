@@ -1,77 +1,88 @@
 {% load static tailwind_tags %}
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" data-theme="light">
-    {% load static tailwind_tags %}
+  {% load static tailwind_tags %}
 
-    <!DOCTYPE html>
-    <html lang="en" data-theme="light">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!doctype html>
+  <html lang="en" data-theme="light">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-            <title>{% block title %}RRI Publications Dashboard{% endblock %}</title>
+      <title>{% block title %}RRI Publications Dashboard{% endblock %}</title>
 
-            {% tailwind_css %}
+      {% tailwind_css %}
 
-            <script src="{% static 'js/chart.min.js' %}"></script>
-            <script src="{% static 'js/alpine.min.js' %}" defer></script>
-            <script src="{% static 'js/lucide.min.js' %}"></script>
-        </head>
+      <script src="{% static 'js/chart.min.js' %}"></script>
+      <script src="{% static 'js/alpine.min.js' %}" defer></script>
+      <script src="{% static 'js/lucide.min.js' %}"></script>
+    </head>
 
-        <body class="bg-base-200 min-h-screen" x-data="sidebarSetup()" x-init="init()">
+    <body
+      class="bg-base-200 min-h-screen"
+      x-data="sidebarSetup()"
+      x-init="init()"
+    >
+      {% block sidebar %} {% include "dashboard/sidebar.html" %} {% endblock %}
 
-            {% block sidebar %}
-                {% include "dashboard/sidebar.html" %}
-            {% endblock %}
+      <!-- Main Content Wrapper: shifts right to make room for the FIXED sidebar -->
+      <div
+        class="flex flex-col min-h-screen transition-all duration-300"
+        :class="isCollapsed ? 'lg:ml-[76px]' : 'lg:ml-72'"
+      >
+        <header
+          class="navbar bg-base-100/80 backdrop-blur border-b border-base-300 px-4 sm:px-6 py-3 sticky top-0 z-30"
+        >
+          <div class="flex-1 flex items-center gap-3 min-w-0">
+            <!-- Animated Hamburger -->
+            <button
+              @click="isSidebarOpen = !isSidebarOpen"
+              class="lg:hidden relative w-9 h-9 flex items-center justify-center btn btn-ghost btn-circle shrink-0"
+              aria-label="Toggle sidebar"
+            >
+              <div class="w-5 h-4 relative flex flex-col justify-between">
+                <span
+                  class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
+                  :class="isSidebarOpen && 'rotate-45 translate-y-[7px]'"
+                ></span>
+                <span
+                  class="block h-0.5 w-full bg-current rounded-full transition-all duration-300"
+                  :class="isSidebarOpen && 'opacity-0'"
+                ></span>
+                <span
+                  class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
+                  :class="isSidebarOpen && '-rotate-45 -translate-y-[7px]'"
+                ></span>
+              </div>
+            </button>
 
-        <!-- Main Content Wrapper: shifts right to make room for the FIXED sidebar -->
-            <div class="flex flex-col min-h-screen transition-all duration-300"
-                 :class="isCollapsed ? 'lg:ml-[76px]' : 'lg:ml-72'">
+            <h1 class="text-lg sm:text-xl font-semibold truncate">
+              {% block page_title %}Dashboard{% endblock %}
+            </h1>
+          </div>
+        </header>
 
-                <header class="navbar bg-base-100/80 backdrop-blur border-b border-base-300 px-4 sm:px-6 py-3 sticky top-0 z-30">
-                    <div class="flex-1 flex items-center gap-3 min-w-0">
+        <main class="flex-1 overflow-y-auto p-4 sm:p-8">
+          {% block content %}{% endblock %}
+        </main>
+      </div>
 
-                    <!-- Animated Hamburger -->
-                        <button @click="isSidebarOpen = !isSidebarOpen"
-                                class="lg:hidden relative w-9 h-9 flex items-center justify-center btn btn-ghost btn-circle shrink-0"
-                                aria-label="Toggle sidebar">
-                            <div class="w-5 h-4 relative flex flex-col justify-between">
-                                <span class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
-                                      :class="isSidebarOpen && 'rotate-45 translate-y-[7px]'"></span>
-                                <span class="block h-0.5 w-full bg-current rounded-full transition-all duration-300"
-                                      :class="isSidebarOpen && 'opacity-0'"></span>
-                                <span class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
-                                      :class="isSidebarOpen && '-rotate-45 -translate-y-[7px]'"></span>
-                            </div>
-                        </button>
+      <script>
+        function sidebarSetup() {
+          return {
+            isSidebarOpen: false,
+            isCollapsed: localStorage.getItem("sidebarCollapsed") === "true",
 
-                        <h1 class="text-lg sm:text-xl font-semibold truncate">
-                            {% block page_title %}Dashboard{% endblock %}
-                        </h1>
-                    </div>
-                </header>
-
-                <main class="flex-1 overflow-y-auto p-4 sm:p-8">
-                    {% block content %}{% endblock %}
-                </main>
-            </div>
-
-            <script>
-                function sidebarSetup() {
-                    return {
-                        isSidebarOpen: false,
-                        isCollapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-
-                        init() {
-                            this.$watch('isCollapsed', (value) => {
-                                localStorage.setItem('sidebarCollapsed', value);
-                            });
-                            this.$nextTick(() => lucide.createIcons());
-                        }
-                    }
-                }
-            </script>
-
-        </body>
-    </html>
+            init() {
+              this.$watch("isCollapsed", (value) => {
+                localStorage.setItem("sidebarCollapsed", value);
+              });
+              this.$nextTick(() => lucide.createIcons());
+            },
+          };
+        }
+      </script>
+    </body>
+  </html>
+</html>

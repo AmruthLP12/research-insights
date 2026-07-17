@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}{{ document_type }}{% endblock %}
+{% block content %}
+    <div class="space-y-8">
+        {% include "components/page_header.html" with icon="📄" title=document_type subtitle="Detailed publication analysis by document type." %}
+        <div class="stats stats-vertical md:stats-horizontal shadow border border-base-300 w-full bg-base-100">
+            {% include "components/stats_cards.html" with title="Publications" value=total_publications color="text-primary" %}
+            {% include "components/stats_cards.html" with title="Total Impact" value=total_impact_factor|floatformat:2 color="text-secondary" %}
+            {% include "components/stats_cards.html" with title="Average Impact" value=average_impact_factor|floatformat:2 color="text-accent" %}
+            {% include "components/stats_cards.html" with title="Highest Impact" value=highest_impact_factor|floatformat:2 color="text-success" %}
+        </div>
+        <div class="grid grid-cols-1 gap-6">
+            {% include "components/chart_card.html" with title="Publication Trend" id="trendChart" %}
+        </div>
+        <div class="card bg-base-100 shadow border border-base-300">
+            <div class="card-body">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="card-title">Publications</h2>
+                        <p class="text-base-content/60 text-sm">
+                            Showing
+                            {{ page_obj.start_index }}
+                            -
+                            {{ page_obj.end_index }}
+                            of
+                            {{ page_obj.paginator.count }}
+                            publications
+                        </p>
+                    </div>
+                    <span class="badge badge-primary badge-outline badge-lg">
+                        {{ page_obj.paginator.count }}
+                        Records
+                    </span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra table-pin-rows">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Title</th>
+                                <th>Journal</th>
+                                <th>Year</th>
+                                <th>Impact Factor</th>
+                                <th>Authors</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for publication in page_obj %}
+                                <tr>
+                                    <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                                    <td class="max-w-md">{{ publication.title }}</td>
+                                    <td>{{ publication.journal.name|default:"—" }}</td>
+                                    <td>{{ publication.date_published.year }}</td>
+                                    <td>{{ publication.journal.impact_factor|default:0|floatformat:2 }}</td>
+                                    <td>
+                                        {% for author in publication.authors.all %}
+                                            {{ author.first_name }} {{ author.last_name }}{% if not forloop.last %}, {% endif %}
+                                        {% empty %}
+                                            —
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'publications:publication_detail' publication.pk %}"
+                                           class="btn btn-sm btn-primary btn-outline">View</a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7">
+                                        {% include "components/empty_state.html" with title="No publications found" description="There are no publications for this document type." %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% include "components/pagination.html" with object_name="publications" %}
+            </div>
+        </div>
+    </div>
+    {{ publication_trend_data|json_script:"trend-data" }}
+    <script>
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const data = JSON.parse(document.getElementById("trend-data").textContent);
+
+    if (!data.length) return;
+
+    new Chart(
+        document.getElementById("trendChart"),
+        {
+            type: "line",
+            data: {
+                labels: data.map(x => x.date_published__year),
+                datasets: [{
+                    data: data.map(x => x.total),
+                    borderWidth: 3,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        }
+    );
+
+});
+
+    </script>
+{% endblock %}

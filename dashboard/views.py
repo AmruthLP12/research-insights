@@ -1,13 +1,15 @@
-from django.db.models import Count, Avg, Sum, Max, Prefetch
+from django.db.models import Count, Avg, Sum, Max, Prefetch, Min
 from django.urls import reverse
 from dashboard.filters import DynamicFilter
 from publications.models import (
+    Journal,
     Publication,
     Author,
     AuthorAffiliation,
 )
 from django.views.generic import TemplateView
 from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404
 
 
 class DashboardHomeView(TemplateView):
@@ -184,6 +186,74 @@ class DocumentTypesView(TemplateView):
                     },
                     {
                         "label": "Document Types",
+                    },
+                ],
+            }
+        )
+
+        return context
+
+
+class DocumentTypeDetailView(TemplateView):
+    template_name = "dashboard/document_type_detail.html"
+
+    paginate_by = 10
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        document_type = self.kwargs["document_type"]
+
+        publications = (
+            Publication.objects.filter(document_type=document_type)
+            .select_related("journal")
+            .prefetch_related(
+                "authors",
+                "departments",
+            )
+            .order_by("-date_published")
+        )
+
+        paginator = Paginator(
+            publications,
+            self.paginate_by,
+        )
+
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        summary = publications.aggregate(
+            total_publications=Count("id"),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            highest_impact_factor=Max("journal__impact_factor"),
+        )
+
+        yearly_data = (
+            publications.values("date_published__year")
+            .annotate(total=Count("id"))
+            .order_by("date_published__year")
+        )
+
+        context.update(
+            {
+                "document_type": document_type,
+                "page_obj": page_obj,
+                "publication_trend_data": list(yearly_data),
+                "total_publications": summary["total_publications"] or 0,
+                "total_impact_factor": summary["total_impact_factor"] or 0,
+                "average_impact_factor": summary["average_impact_factor"] or 0,
+                "highest_impact_factor": summary["highest_impact_factor"] or 0,
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Document Types",
+                        "url": reverse("dashboard:documents"),
+                    },
+                    {
+                        "label": document_type,
                     },
                 ],
             }
@@ -693,6 +763,71 @@ class JournalsView(TemplateView):
                     },
                     {
                         "label": "Journal Overview",
+                    },
+                ],
+            }
+        )
+
+        return context
+
+
+class JournalDetailView(TemplateView):
+    template_name = "dashboard/journal_detail.html"
+    paginate_by = 10
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        journal = get_object_or_404(
+            Journal,
+            pk=self.kwargs["journal_id"],
+        )
+
+        publications = (
+            Publication.objects.filter(journal=journal)
+            .select_related("journal")
+            .prefetch_related(
+                "authors",
+                "departments",
+            )
+            .order_by("-date_published")
+        )
+
+        paginator = Paginator(
+            publications,
+            self.paginate_by,
+        )
+
+        page_obj = paginator.get_page(self.request.GET.get("page"))
+
+        summary = publications.aggregate(
+            total_publications=Count("id"),
+            total_impact_factor=Sum("journal__impact_factor"),
+            average_impact_factor=Avg("journal__impact_factor"),
+            first_publication=Min("date_published"),
+            latest_publication=Max("date_published"),
+        )
+
+        context.update(
+            {
+                "journal": journal,
+                "page_obj": page_obj,
+                "total_publications": summary["total_publications"] or 0,
+                "total_impact_factor": summary["total_impact_factor"] or 0,
+                "average_impact_factor": summary["average_impact_factor"] or 0,
+                "first_publication": summary["first_publication"],
+                "latest_publication": summary["latest_publication"],
+                "breadcrumbs": [
+                    {
+                        "label": "Dashboard",
+                        "url": reverse("dashboard:home"),
+                    },
+                    {
+                        "label": "Journal Overview",
+                        "url": reverse("dashboard:journals"),
+                    },
+                    {
+                        "label": journal.name,
                     },
                 ],
             }
