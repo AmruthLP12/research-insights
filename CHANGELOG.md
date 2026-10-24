@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed - 2026-10-24
 
+#### Task 2.2: Refactor Django Environment Configuration into env.py
+- **Extraction of Environment Helpers**:
+  - Created [`rri_publications_dashboard/env.py`](rri_publications_dashboard/env.py) containing all environment-variable parsing, validation, and loading logic (`load_env_file`, `parse_bool`, `get_bool`, `parse_list`, `get_list`, `get_secret_key`, `get_allowed_hosts`).
+  - Simplified [`rri_publications_dashboard/settings.py`](rri_publications_dashboard/settings.py) to purely declarative settings statements (`DEBUG = get_bool(...)`, `SECRET_KEY = get_secret_key(...)`, `ALLOWED_HOSTS = get_allowed_hosts(...)`).
+  - Standard library and Django exceptions (`ImproperlyConfigured`) used exclusively; zero external dependencies added.
+- **Verification & Precedence Guarantees**:
+  - Verified process environment variables take strict precedence over `.env` file entries via `os.environ.setdefault`.
+  - Maintained all fail-closed security rules for production (`DEBUG=False`): missing/insecure secret key and empty/wildcard `ALLOWED_HOSTS` raise `ImproperlyConfigured`.
+  - Maintained legacy `SECRET_KEY` compatibility fallback and stable local development key (`DEV_SECRET_KEY_FALLBACK`).
+- **Files Modified / Created**:
+  - `rri_publications_dashboard/env.py` (created)
+  - `rri_publications_dashboard/settings.py` (modified)
+- **Verification Performed**:
+  - Comprehensive unit test suite (`scratch/test_settings.py`):
+    - Tested valid and invalid booleans (`parse_bool`, `get_bool`).
+    - Tested process environment precedence over `.env` files.
+    - Tested production validation failure modes (missing secret, short secret, insecure prefix, empty hosts, wildcard hosts).
+    - Tested production valid configurations and legacy `SECRET_KEY` fallback.
+    - Tested development defaults and stable fallback key.
+  - `venv/bin/python manage.py check`: Passed with 0 issues.
+  - `venv/bin/python manage.py check --deploy`: 0 warnings for `SECRET_KEY` and `DEBUG`; only 4 expected SSL/cookie warnings remain.
+  - `venv/bin/python manage.py test`: 0 tests ran, 0 errors.
+  - `git diff --check`: 0 whitespace or formatting errors.
+
 #### Task 2.1: Refactor Django Settings for Readability
 - **Code Cleanliness & Modular Structure**:
   - Moved all imports (`os`, `pathlib.Path`, `django.core.exceptions.ImproperlyConfigured`) to the top of `rri_publications_dashboard/settings.py`.

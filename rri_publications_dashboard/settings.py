@@ -5,102 +5,18 @@ Django settings for rri_publications_dashboard project.
 import os
 from pathlib import Path
 
-from django.core.exceptions import ImproperlyConfigured
+from .env import get_allowed_hosts, get_bool, get_secret_key, load_env_file
 
 # --- BASE DIRECTORIES ---
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# --- ENVIRONMENT LOADING & HELPERS ---
-def _load_env_file(env_path: Path) -> None:
-    """Load environment variables from a .env file without overwriting existing environment."""
-    if not env_path.is_file():
-        return
-    with open(env_path, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, val = line.partition("=")
-                key = key.strip()
-                val = val.strip().strip("'\"")
-                os.environ.setdefault(key, val)
-
-
-_load_env_file(BASE_DIR / ".env")
-
-
-def _parse_bool(name: str, value: str | None, default: bool = False) -> bool:
-    """Strict boolean parser for environment variables.
-
-    Returns default if value is None or empty.
-    Raises ImproperlyConfigured for invalid/unrecognized boolean strings.
-    """
-    if value is None or str(value).strip() == "":
-        return default
-    normalized = str(value).strip().lower()
-    if normalized in ("true", "1", "yes", "t", "on"):
-        return True
-    if normalized in ("false", "0", "no", "f", "off"):
-        return False
-    raise ImproperlyConfigured(
-        f"Invalid boolean value for environment variable '{name}': '{value}'. "
-        f"Allowed values are 'true', 'false', '1', '0', 'yes', 'no', 't', 'f', 'on', 'off'."
-    )
-
-
-def _parse_list(value: str | None) -> list[str]:
-    """Parse comma-separated string into a trimmed, non-empty list of strings."""
-    if not value:
-        return []
-    return [item.strip() for item in str(value).split(",") if item.strip()]
-
+# --- ENVIRONMENT CONFIGURATION ---
+load_env_file(BASE_DIR / ".env")
 
 # --- CORE SECURITY SETTINGS ---
-DEBUG = _parse_bool("DEBUG", os.environ.get("DEBUG"), default=False)
-
-# SECRET_KEY resolution and fail-closed validation
-# DJANGO_SECRET_KEY is canonical; SECRET_KEY is supported for legacy/deployment compatibility.
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or os.environ.get("SECRET_KEY")
-
-# Stable fallback key used ONLY in development (DEBUG=True) when no environment key is provided.
-# A fixed dev fallback avoids generating a new ephemeral key per process restart, which would
-# invalidate sessions and CSRF tokens across reloads.
-DEV_SECRET_KEY_FALLBACK = "django-insecure-development-only-fallback-key-do-not-use-in-production"
-
-if not SECRET_KEY:
-    if DEBUG:
-        SECRET_KEY = DEV_SECRET_KEY_FALLBACK
-    else:
-        raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY environment variable is required when DEBUG is False."
-        )
-elif not DEBUG:
-    if SECRET_KEY.startswith("django-insecure-") or len(SECRET_KEY) < 50:
-        raise ImproperlyConfigured(
-            "Insecure DJANGO_SECRET_KEY detected in production. A secure, random key of at least 50 characters is required."
-        )
-
-# ALLOWED_HOSTS resolution and non-wildcard production enforcement
-raw_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "")
-parsed_hosts = _parse_list(raw_allowed_hosts)
-
-if DEBUG:
-    dev_hosts = ["localhost", "127.0.0.1", "[::1]"]
-    if parsed_hosts:
-        ALLOWED_HOSTS = list(dict.fromkeys(parsed_hosts + dev_hosts))
-    else:
-        ALLOWED_HOSTS = dev_hosts
-else:
-    if not parsed_hosts:
-        raise ImproperlyConfigured(
-            "ALLOWED_HOSTS environment variable is required and cannot be empty when DEBUG is False."
-        )
-    if "*" in parsed_hosts:
-        raise ImproperlyConfigured(
-            "Wildcard '*' in ALLOWED_HOSTS is not permitted in production (when DEBUG is False)."
-        )
-    ALLOWED_HOSTS = parsed_hosts
-
+DEBUG = get_bool("DEBUG", default=False)
+SECRET_KEY = get_secret_key(debug=DEBUG)
+ALLOWED_HOSTS = get_allowed_hosts(debug=DEBUG)
 
 # --- APPLICATION DEFINITION ---
 INSTALLED_APPS = [

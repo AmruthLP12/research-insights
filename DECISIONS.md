@@ -11,6 +11,7 @@ This document records the architectural, security, and engineering decisions mad
 | **[D-001](#d-001-incremental-remediation-workflow)** | Incremental Remediation Workflow and Evidence-Based Verification | 2026-10-24 | **Accepted** |
 | **[D-002](#d-002-environment-driven-security-settings-and-fail-closed-configuration)** | Environment-Driven Security Settings and Fail-Closed Configuration | 2026-10-24 | **Accepted** |
 | **[D-003](#d-003-settings-module-refactoring-and-strict-environment-validation)** | Settings Module Refactoring and Strict Environment Validation | 2026-10-24 | **Accepted** |
+| **[D-004](#d-004-separation-of-environment-helpers-into-envpy)** | Separation of Environment Helpers into Dedicated env.py Module | 2026-10-24 | **Accepted** |
 
 ---
 
@@ -139,6 +140,37 @@ Because there is currently **0% automated test coverage**, attempting broad or c
     - Zero external dependencies introduced.
   - **Negative / Trade-offs**:
     - Developers relying on informal boolean synonyms outside `('true', '1', 'yes', 't', 'on')` and `('false', '0', 'no', 'f', 'off')` must use supported values.
+
+---
+
+## D-004: Separation of Environment Helpers into Dedicated env.py Module
+
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**:
+  In `D-002` and `D-003`, environment loading and security validation helpers were consolidated directly within `rri_publications_dashboard/settings.py`. While this minimized initial file proliferation, mixing 70+ lines of imperative parsing, file I/O, and validation routines with declarative Django settings compromised the readability of `settings.py` and made isolated unit testing of configuration functions awkward without triggering full Django settings evaluation.
+
+- **Decision**:
+  1. **Dedicated `env.py` Module**:
+     - Extract all environment loading and validation functions (`load_env_file`, `parse_bool`, `get_bool`, `parse_list`, `get_list`, `get_secret_key`, `get_allowed_hosts`) and constants (`DEV_SECRET_KEY_FALLBACK`, `TRUE_STRINGS`, `FALSE_STRINGS`) into `rri_publications_dashboard/env.py`.
+  2. **Clean Declarative `settings.py`**:
+     - Keep `settings.py` purely declarative by importing the helpers via `from .env import get_allowed_hosts, get_bool, get_secret_key, load_env_file`.
+  3. **Strict Boundaries & No Framework Creep**:
+     - Keep `env.py` strictly focused on environment variables; avoid creating a general-purpose settings engine or introducing third-party configuration libraries (`django-environ`, `dynaconf`).
+  4. **Preserved Guarantees**:
+     - Retain fail-closed validation for production (`DEBUG=False`), backward-compatibility with legacy `SECRET_KEY`, and process environment precedence over `.env`.
+
+- **Alternatives Considered**:
+  - **Retain helpers in `settings.py`**: Rejected because separating imperative parsing from declarative configuration improves code maintainability, reusability, and direct testability.
+  - **Adopt `django-environ`**: Rejected because Python standard library (`os`, `pathlib`) and Django's `ImproperlyConfigured` satisfy all requirements cleanly with zero additional dependencies.
+
+- **Consequences**:
+  - **Positive**:
+    - `settings.py` is succinct, readable, and standard.
+    - Environment helpers can be imported and tested independently without bootstrapping the entire Django settings machinery.
+    - Clear separation of concerns between environment ingestion/validation and Django settings assignment.
+  - **Negative / Trade-offs**:
+    - Introduces an additional file (`rri_publications_dashboard/env.py`) in the core project package.
 
 ---
 
