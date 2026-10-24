@@ -5,7 +5,15 @@ Django settings for rri_publications_dashboard project.
 import os
 from pathlib import Path
 
-from .env import get_allowed_hosts, get_bool, get_secret_key, load_env_file
+from .env import (
+    get_allowed_hosts,
+    get_bool,
+    get_int,
+    get_secret_key,
+    get_secure_proxy_ssl_header,
+    load_env_file,
+    validate_email_config,
+)
 
 # --- BASE DIRECTORIES ---
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -17,6 +25,17 @@ load_env_file(BASE_DIR / ".env")
 DEBUG = get_bool("DEBUG", default=False)
 SECRET_KEY = get_secret_key(debug=DEBUG)
 ALLOWED_HOSTS = get_allowed_hosts(debug=DEBUG)
+
+# HTTPS and Cookie Security
+# In development (DEBUG=True), default to HTTP-friendly values.
+# In production (DEBUG=False), secure cookies default to True unless overridden.
+SESSION_COOKIE_SECURE = get_bool("SESSION_COOKIE_SECURE", default=not DEBUG)
+CSRF_COOKIE_SECURE = get_bool("CSRF_COOKIE_SECURE", default=not DEBUG)
+SECURE_SSL_REDIRECT = get_bool("SECURE_SSL_REDIRECT", default=False)
+SECURE_HSTS_SECONDS = get_int("SECURE_HSTS_SECONDS", default=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = get_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+SECURE_HSTS_PRELOAD = get_bool("SECURE_HSTS_PRELOAD", default=False)
+SECURE_PROXY_SSL_HEADER = get_secure_proxy_ssl_header()
 
 # --- APPLICATION DEFINITION ---
 INSTALLED_APPS = [
@@ -81,6 +100,9 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "dashboard.context_processors.dashboard_sidebar",
             ],
+            "builtins": [
+                "accounts.templatetags.form_tags",
+            ],
         },
     },
 ]
@@ -99,6 +121,33 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+
+# --- EMAIL CONFIGURATION ---
+# Default to console backend in development if unset; default to SMTP in production.
+_default_email_backend = (
+    "django.core.mail.backends.console.EmailBackend"
+    if DEBUG
+    else "django.core.mail.backends.smtp.EmailBackend"
+)
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND") or _default_email_backend
+EMAIL_HOST = os.environ.get("EMAIL_HOST")
+EMAIL_PORT = get_int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = get_bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = get_bool("EMAIL_USE_SSL", default=False)
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@rri.res.in")
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+
+validate_email_config(
+    debug=DEBUG,
+    backend=EMAIL_BACKEND,
+    host=EMAIL_HOST,
+    port=EMAIL_PORT,
+    use_tls=EMAIL_USE_TLS,
+    use_ssl=EMAIL_USE_SSL,
+)
 
 
 # --- DATABASE ---

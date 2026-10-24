@@ -1,8 +1,48 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from publications.models import Publication
 
 User = get_user_model()
+
+
+class PublicationOwnershipTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="researcher", password="password123", role="user"
+        )
+        self.publication = Publication.objects.create(
+            title="Quantum Hall Effect in Graphene",
+            document_type="Journal Article",
+            date_published="2023-01-01",
+            collaboration_type="National",
+            created_by=self.user,
+        )
+
+    def test_publication_created_by_set_null_on_user_delete(self):
+        user_id = self.user.id
+        pub_id = self.publication.id
+
+        # Delete the user who created the publication
+        self.user.delete()
+
+        # The publication must NOT be deleted
+        self.assertTrue(Publication.objects.filter(id=pub_id).exists())
+
+        # The publication's created_by must now be NULL (None)
+        self.publication.refresh_from_db()
+        self.assertIsNone(self.publication.created_by)
+
+    def test_publication_created_without_user(self):
+        anon_pub = Publication.objects.create(
+            title="Cosmological Observations",
+            document_type="Journal Article",
+            date_published="2023-02-01",
+            collaboration_type="International",
+            created_by=None,
+        )
+        self.assertIsNone(anon_pub.created_by)
+        self.assertTrue(Publication.objects.filter(id=anon_pub.id).exists())
 
 
 class PublicationsAccessControlTestCase(TestCase):

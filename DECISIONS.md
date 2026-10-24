@@ -13,6 +13,7 @@ This document records the architectural, security, and engineering decisions mad
 | **[D-003](#d-003-settings-module-refactoring-and-strict-environment-validation)** | Settings Module Refactoring and Strict Environment Validation | 2026-10-24 | **Accepted** |
 | **[D-004](#d-004-separation-of-environment-helpers-into-envpy)** | Separation of Environment Helpers into Dedicated env.py Module | 2026-10-24 | **Accepted** |
 | **[D-005](#d-005-dashboard-authentication-and-role-based-access-control)** | Dashboard Authentication and Role-Based Access Control | 2026-10-24 | **Accepted** |
+| **[D-006](#d-006-publication-ownership-retention-password-reset-workflow-and-production-security-hardening)** | Publication Ownership Retention, Password Reset Workflow, and Production Security Hardening | 2026-10-24 | **Accepted** |
 
 ---
 
@@ -212,6 +213,46 @@ Because there is currently **0% automated test coverage**, attempting broad or c
 
 ---
 
+## D-006: Publication Ownership Retention, Password Reset Workflow, and Production Security Hardening
+
+### Context
+Following the implementation of dashboard authentication and RBAC (D-005), three critical security and data-integrity gaps remained:
+1. **Accidental Publication Cascade Deletion**: `Publication.created_by` was defined with `on_delete=models.CASCADE`. Deleting any user account would irreversibly delete every publication ingested or authored by that user.
+2. **Password Reset Workflow Failures**: The password-reset template threw `TemplateSyntaxError: Invalid filter: 'add_class'` due to missing template filters. Furthermore, `accounts/urls.py` namespacing caused `NoReverseMatch` errors during password reset redirects and email dispatch. Additionally, the project lacked environment-driven email configuration for development console output and production SMTP delivery.
+3. **Transport Security & Cookie Policies**: The settings lacked environment toggles for `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, HSTS settings, and reverse-proxy header handling.
+
+### Decision
+
+1. **Protect Publication Records (`SET_NULL`)**:
+   - Change `Publication.created_by` to `on_delete=models.SET_NULL, null=True, blank=True` in `publications/models.py`.
+   - Apply Django migration `0003_alter_publication_created_by`. Deleting a user account sets `created_by` to `NULL` while retaining the full publication record, affiliations, and citations intact.
+
+2. **Repair and Standardize Password Reset Workflow**:
+   - Implement `add_class` filter in `accounts/templatetags/form_tags.py` and register `accounts.templatetags.form_tags` in `TEMPLATES[0]['OPTIONS']['builtins']` in `settings.py`. This resolves the template syntax error cleanly without adding third-party dependencies.
+   - Configure explicit namespaced `success_url` redirects (`accounts:password_reset_done`, `accounts:password_reset_complete`, `accounts:password_change_done`) in `accounts/urls.py`.
+   - Provide `templates/registration/password_reset_email.html` referencing `accounts:password_reset_confirm`.
+   - Prevent user enumeration by ensuring password reset requests for non-existent emails redirect silently to the success page without raising errors.
+
+3. **Environment-Driven Email Configuration**:
+   - In `rri_publications_dashboard/settings.py` and `rri_publications_dashboard/env.py`, set default email backend to `django.core.mail.backends.console.EmailBackend` in development (`DEBUG=True`) and `django.core.mail.backends.smtp.EmailBackend` in production (`DEBUG=False`).
+   - Implement strict fail-closed validation (`validate_email_config`): disallow simultaneous `EMAIL_USE_TLS` and `EMAIL_USE_SSL`, and require `EMAIL_HOST` in production.
+
+4. **Production Transport Security and Cookie Settings**:
+   - Add environment-driven toggles in `settings.py` for `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`, `SECURE_HSTS_INCLUDE_SUBDOMAINS`, and `SECURE_HSTS_PRELOAD`.
+   - Support reverse proxies (e.g., Nginx or Apache mod_wsgi terminate TLS) via `USE_X_FORWARDED_PROTO=True` mapping to `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')`.
+   - Keep development defaults permissive (HTTP-compatible) while allowing full compliance with `python manage.py check --deploy` in production.
+
+### Consequences
+- **Positive**:
+  - Publication records can never be accidentally erased through account deletion.
+  - Password reset functions end-to-end without template crashes or reverse URL errors.
+  - Development requires zero external SMTP setup (emails display in console).
+  - Production deployments can achieve zero warnings on `check --deploy` by setting standard environment variables.
+- **Negative / Trade-offs**:
+  - Nullable `created_by` foreign key requires views and templates to handle unowned publications gracefully (already handled by existing code).
+
+---
+
 ## Open Questions Affecting Implementation
 
 The following institutional and operational questions directly impact future remediation steps and must be aligned with project stakeholders:
@@ -228,8 +269,7 @@ The following institutional and operational questions directly impact future rem
    - *Implementation Impact*: Governs whether to introduce database connection pooling, PostgreSQL-specific search features, and migration scripts.
 
 4. **Institutional Email Relay (SMTP)**:
-   - *Question*: What SMTP host, port, credentials, or transactional email service will be used for password resets?
-   - *Implementation Impact*: Determines how `EMAIL_BACKEND` and `.env` credentials should be structured for development vs. production.
+   - *Status*: **Resolved by D-006**. Application supports console backend for development and parameterized SMTP configuration via environment variables (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `DEFAULT_FROM_EMAIL`) in production.
 
 5. **Orphaned Manual Publication Templates**:
    - *Question*: Should the manual entry forms (`create_publication.html`, `edit_publication.html`) be wired up to new Create/Edit views, or are all publications strictly required to originate from Web of Science export files?

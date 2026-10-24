@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security & Reliability - 2026-10-24
+
+#### Task 6: Resolve Security Gaps: Publication Ownership, Password Reset Workflow, and Production Transport Security
+- **Publication Ownership Protection**:
+  - Changed `Publication.created_by` relationship from `on_delete=models.CASCADE` to `on_delete=models.SET_NULL, null=True, blank=True` in [`publications/models.py`](publications/models.py).
+  - Generated and applied migration `0003_alter_publication_created_by` to decouple publication record lifespan from user accounts, preventing catastrophic data loss when user accounts are deleted.
+- **Password Reset Workflow & Filter Repair**:
+  - Resolved `TemplateSyntaxError: Invalid filter: 'add_class'` on password reset templates by implementing the `add_class` filter in [`accounts/templatetags/form_tags.py`](accounts/templatetags/form_tags.py) and registering `accounts.templatetags.form_tags` in `TEMPLATES[0]['OPTIONS']['builtins']` in [`rri_publications_dashboard/settings.py`](rri_publications_dashboard/settings.py).
+  - Resolved `NoReverseMatch: Reverse for 'password_reset_done' not found` and `NoReverseMatch: Reverse for 'password_reset_confirm' not found` across the namespaced `accounts` URL patterns by configuring explicit namespaced `success_url`s in [`accounts/urls.py`](accounts/urls.py) (`accounts:password_reset_done`, `accounts:password_reset_complete`, `accounts:password_change_done`) and creating [`templates/registration/password_reset_email.html`](templates/registration/password_reset_email.html) referencing `accounts:password_reset_confirm`.
+  - Configured environment-driven email settings in [`rri_publications_dashboard/settings.py`](rri_publications_dashboard/settings.py) and [`rri_publications_dashboard/env.py`](rri_publications_dashboard/env.py): default to console backend in development (`DEBUG=True`) and SMTP backend in production (`DEBUG=False`), with fail-fast validation against conflicting TLS/SSL options or missing `EMAIL_HOST`.
+- **Production Transport Security & Cookie Hardening**:
+  - Configured HTTPS/cookie environment toggles in [`rri_publications_dashboard/settings.py`](rri_publications_dashboard/settings.py): `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`, `SECURE_HSTS_INCLUDE_SUBDOMAINS`, `SECURE_HSTS_PRELOAD`, and `SECURE_PROXY_SSL_HEADER` (`HTTP_X_FORWARDED_PROTO` support via `USE_X_FORWARDED_PROTO`).
+  - Added `"testserver"` to dev `ALLOWED_HOSTS` in [`rri_publications_dashboard/env.py`](rri_publications_dashboard/env.py) to avoid `DisallowedHost` errors during test runs.
+  - Updated [`.env.example`](.env.example) with complete documentation and production guidelines for email and HTTPS security variables.
+- **Test Coverage Expansion**:
+  - Expanded test suite from 9 to 20 automated tests across `publications`, `accounts`, and `dashboard`, all passing in ~28.7s:
+    - `publications/tests.py`: Added `PublicationOwnershipTestCase` verifying that deleting a user sets `publication.created_by` to `None` without deleting the publication, and that publications can be created without a user.
+    - `accounts/tests.py`: Added `FormTagsFilterTestCase`, `PasswordResetWorkflowTestCase` (verifying form rendering without template syntax error, email dispatch to `mail.outbox`, and protection against user enumeration on non-existent emails), and `EmailAndSecurityConfigTestCase` (verifying configuration validation and proxy header parsing).
+    - `dashboard/tests.py`: Expanded `DashboardAuthenticationTestCase` to exhaustively test all 21 dashboard views (11 main views and 10 detail views) for anonymous redirect to login and authenticated 200 OK.
+  - Ran `manage.py check` (0 issues), `manage.py makemigrations --check --dry-run` (0 changes detected), and `manage.py check --deploy` (passed with 0 issues in simulated production environment).
+- **Files Modified / Created**:
+  - `publications/models.py` (modified)
+  - `publications/migrations/0003_alter_publication_created_by.py` (created)
+  - `accounts/templatetags/__init__.py` (created)
+  - `accounts/templatetags/form_tags.py` (created)
+  - `accounts/urls.py` (modified)
+  - `templates/registration/password_reset_email.html` (created)
+  - `rri_publications_dashboard/settings.py` (modified)
+  - `rri_publications_dashboard/env.py` (modified)
+  - `.env.example` (modified)
+  - `publications/tests.py` (modified)
+  - `accounts/tests.py` (modified)
+  - `dashboard/tests.py` (modified)
+- **Remaining Production Considerations**:
+  - In production deployments, set `DEBUG=False`, configure valid SMTP credentials (`EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`), provide a 50+ character random `DJANGO_SECRET_KEY`, and enable `SECURE_SSL_REDIRECT=True` and `SECURE_HSTS_SECONDS=31536000` behind an HTTPS reverse proxy (with `USE_X_FORWARDED_PROTO=True` if proxying over TLS).
+
 ### Security - 2026-10-24
 
 #### Task 5: Enforce Dashboard Authentication and Role-Based Authorization
