@@ -10,6 +10,7 @@ This document records the architectural, security, and engineering decisions mad
 | :--- | :--- | :--- | :--- |
 | **[D-001](#d-001-incremental-remediation-workflow)** | Incremental Remediation Workflow and Evidence-Based Verification | 2026-10-24 | **Accepted** |
 | **[D-002](#d-002-environment-driven-security-settings-and-fail-closed-configuration)** | Environment-Driven Security Settings and Fail-Closed Configuration | 2026-10-24 | **Accepted** |
+| **[D-003](#d-003-settings-module-refactoring-and-strict-environment-validation)** | Settings Module Refactoring and Strict Environment Validation | 2026-10-24 | **Accepted** |
 
 ---
 
@@ -98,6 +99,46 @@ Because there is currently **0% automated test coverage**, attempting broad or c
     - Zero changes to `requirements.txt` or third-party packages.
   - **Negative / Trade-offs**:
     - Production deployments must explicitly provide valid `DJANGO_SECRET_KEY` (min 50 chars) and `ALLOWED_HOSTS` environment variables or `.env` files.
+
+---
+
+## D-003: Settings Module Refactoring and Strict Environment Validation
+
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**:
+  Following the initial environment hardening in `D-002`, `settings.py` required cleanup to improve readability, structure, and reliability. Specifically:
+  1. Imports were fragmented across the module (e.g. `import secrets` inside an execution block).
+  2. Boolean parsing silently converted unrecognized strings (`DEBUG=maybe`) to `False`, masking configuration typos.
+  3. Generating an ephemeral random secret key on every process startup in development invalidated user sessions and CSRF tokens across local `runserver` reloads.
+  4. Related settings (such as authentication models, URLs, and password validators) were dispersed across unrelated sections.
+
+- **Decision**:
+  1. **Top-Level Imports & Logical Sectioning**:
+     - Consolidate all standard library and Django imports at the top of `settings.py`.
+     - Organize settings into standard, labeled sections (`BASE DIRECTORIES`, `ENVIRONMENT LOADING & HELPERS`, `CORE SECURITY SETTINGS`, `APPLICATION DEFINITION`, `MIDDLEWARE`, `URLS & WSGI`, `TEMPLATES`, `AUTHENTICATION & USERS`, `DATABASE`, `INTERNATIONALIZATION`, `STATIC FILES`, `DEFAULT AUTO FIELD`, `TAILWIND & THEME`).
+  2. **In-File Helpers without Unnecessary Abstractions**:
+     - Maintain lightweight helpers (`_load_env_file`, `_parse_bool`, `_parse_list`) directly inside `settings.py`. Extracting them to a separate package or module was evaluated but rejected as premature abstraction for ~35 lines of straightforward parsing.
+  3. **Strict Boolean Parsing**:
+     - Upgrade `_parse_bool` to reject any unrecognized string with `ImproperlyConfigured`, preventing silent misconfigurations when operators mistype boolean flags. Unset or empty values safely default to `False`.
+  4. **Stable Development Secret Fallback**:
+     - Replace dynamic ephemeral key generation with a fixed, static development fallback (`DEV_SECRET_KEY_FALLBACK`). This prevents local session invalidation on auto-reload while ensuring `DEBUG=False` still strictly requires a secure, non-default production key (>= 50 chars).
+  5. **Backward-Compatible Secret Key Resolution**:
+     - Document `DJANGO_SECRET_KEY` as canonical, while retaining fallback lookup for `SECRET_KEY` to prevent breaking existing deployment scripts or environment definitions.
+
+- **Alternatives Considered**:
+  - **Separate `env.py` helper module**: Rejected to avoid unnecessary indirection and file proliferation for simple, local environment reading.
+  - **Requiring manual `.env` creation before `manage.py` can run in dev**: Rejected to ensure new contributors and automated tests can run without mandatory setup steps while maintaining strict production checks.
+  - **Silent fallback for malformed booleans**: Rejected because silent defaults hide operator errors and can lead to unexpected security posture.
+
+- **Consequences**:
+  - **Positive**:
+    - Cleaner, standard Django settings structure with consistent formatting.
+    - Developer sessions persist across local code reloads.
+    - Configuration typos in `DEBUG` fail fast with clear actionable error messages.
+    - Zero external dependencies introduced.
+  - **Negative / Trade-offs**:
+    - Developers relying on informal boolean synonyms outside `('true', '1', 'yes', 't', 'on')` and `('false', '0', 'no', 'f', 'off')` must use supported values.
 
 ---
 

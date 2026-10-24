@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - 2026-10-24
+
+#### Task 2.1: Refactor Django Settings for Readability
+- **Code Cleanliness & Modular Structure**:
+  - Moved all imports (`os`, `pathlib.Path`, `django.core.exceptions.ImproperlyConfigured`) to the top of `rri_publications_dashboard/settings.py`.
+  - Reorganized settings into clean, well-delimited thematic sections with consistent double-quoted strings and section banners (`BASE DIRECTORIES`, `ENVIRONMENT LOADING & HELPERS`, `CORE SECURITY SETTINGS`, `APPLICATION DEFINITION`, `MIDDLEWARE`, `URLS & WSGI`, `TEMPLATES`, `AUTHENTICATION & USERS`, `DATABASE`, `INTERNATIONALIZATION`, `STATIC FILES`, `DEFAULT AUTO FIELD`, `TAILWIND & THEME`).
+  - Extracted helper logic into clean functions (`_load_env_file`, `_parse_bool`, `_parse_list`) without introducing external dependencies or unnecessary abstractions.
+- **Strict Boolean Parsing**:
+  - Updated `_parse_bool` to be strict: unrecognized/invalid boolean values (e.g. `DEBUG=maybe`, `DEBUG=2`) now raise `django.core.exceptions.ImproperlyConfigured` rather than silently converting to `False`.
+  - Unset or empty values safely default to `False`.
+- **Stable Development Secret Key**:
+  - Eliminated per-process random secret key generation (`secrets.token_urlsafe`) which previously invalidated active sessions and CSRF tokens across local `runserver` reloads.
+  - Replaced with a stable, fixed development fallback (`DEV_SECRET_KEY_FALLBACK`) used strictly when `DEBUG=True` and no environment key is supplied.
+  - Production (`DEBUG=False`) continues to strictly reject insecure, short, or missing keys with `ImproperlyConfigured`.
+- **Environment & Deployment Compatibility**:
+  - Canonical secret variable remains `DJANGO_SECRET_KEY`, with backward-compatible fallback to `SECRET_KEY`.
+  - Updated `.env.example` comments to document the stable development fallback and canonical variables.
+- **Files Modified**:
+  - `rri_publications_dashboard/settings.py`
+  - `.env.example`
+- **Verification Performed**:
+  - `test_boolean_parser`: Tested valid truthy (`true`, `1`, `yes`, `t`, `on`), valid falsy (`false`, `0`, `no`, `f`, `off`), empty/None defaults, and invalid values (`maybe`, `2`, `foo`) raising `ImproperlyConfigured`.
+  - `test_production_and_development`:
+    - Production missing secret -> `ImproperlyConfigured` (passed).
+    - Production insecure key (<50 chars or `django-insecure-...`) -> `ImproperlyConfigured` (passed).
+    - Production empty or wildcard `ALLOWED_HOSTS` (`*`, `example.com, *`) -> `ImproperlyConfigured` (passed).
+    - Production valid config -> booted successfully with exact host parsing (passed).
+    - Development stable fallback -> identical stable key across multiple process invocations (passed).
+    - Documented `.env` setup -> loaded valid dev values correctly (passed).
+  - `venv/bin/python manage.py check`: Passed with 0 issues.
+  - `venv/bin/python manage.py check --deploy`: 0 warnings for `SECRET_KEY` and `DEBUG`; only 4 expected SSL/cookie warnings remain.
+  - Settings comparison: Verified all application definitions, middleware, authentication models, database engines, and static configurations remain identical.
+  - `git diff --check`: 0 whitespace or formatting errors.
+
 ### Added - 2026-10-24
 
 #### Task 2: Secure Django Settings and Environment Configuration
