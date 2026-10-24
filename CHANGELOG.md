@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed - 2026-10-24
 
+#### Task 4: Configure STATIC_ROOT and Verify collectstatic
+- **Static Asset Deployment Configuration**:
+  - Configured `STATIC_ROOT = BASE_DIR / "staticfiles"` in [`rri_publications_dashboard/settings.py`](rri_publications_dashboard/settings.py) to define the target directory for static file collection during deployments.
+  - Added `staticfiles/` to [`.gitignore`](.gitignore) to ensure collected deployment assets are not tracked in version control.
+  - Preserved source static paths: `STATIC_URL = "/static/"` and `STATICFILES_DIRS = [BASE_DIR / "static"]` remain intact, distinct, and conflict-free.
+- **Files Modified**:
+  - `rri_publications_dashboard/settings.py`
+  - `.gitignore`
+- **Verification Performed**:
+  - `venv/bin/python manage.py check`: Passed with 0 issues.
+  - `venv/bin/python manage.py collectstatic --noinput --dry-run`: Succeeded (simulated collection of 136 static assets across admin, theme, and custom JS).
+  - `venv/bin/python manage.py collectstatic --noinput`: Succeeded (copied 136 static files to `/home/amruth/pro/django/research-insights/staticfiles`).
+  - `venv/bin/python manage.py check --deploy`: 0 static files warnings; only 4 expected SSL/cookie warnings remain.
+  - `git diff --check`: 0 whitespace or formatting errors.
+- **Limitations & Known Concerns**:
+  - `staticfiles/` contains generated assets for deployment and is purposefully ignored by version control. Apache/Nginx web server configurations must alias `/static/` to `BASE_DIR / "staticfiles"` in production.
+
 #### Task 3: Restore the Missing Publication.article_number Model Field
 - **Model & Schema Reconciliation**:
   - Restored `article_number = models.CharField(max_length=50, blank=True, null=True)` to `Publication` in [`publications/models.py`](publications/models.py), matching applied migration `0002_alter_publication_options_publication_article_number.py` and the existing `db.sqlite3` column definition.
