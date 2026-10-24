@@ -12,6 +12,7 @@ This document records the architectural, security, and engineering decisions mad
 | **[D-002](#d-002-environment-driven-security-settings-and-fail-closed-configuration)** | Environment-Driven Security Settings and Fail-Closed Configuration | 2026-10-24 | **Accepted** |
 | **[D-003](#d-003-settings-module-refactoring-and-strict-environment-validation)** | Settings Module Refactoring and Strict Environment Validation | 2026-10-24 | **Accepted** |
 | **[D-004](#d-004-separation-of-environment-helpers-into-envpy)** | Separation of Environment Helpers into Dedicated env.py Module | 2026-10-24 | **Accepted** |
+| **[D-005](#d-005-dashboard-authentication-and-role-based-access-control)** | Dashboard Authentication and Role-Based Access Control | 2026-10-24 | **Accepted** |
 
 ---
 
@@ -174,13 +175,49 @@ Because there is currently **0% automated test coverage**, attempting broad or c
 
 ---
 
+## D-005: Dashboard Authentication and Role-Based Access Control
+
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**:
+  The security audit ([`07-authentication-authorization-and-security.md`](docs/project-audit/07-authentication-authorization-and-security.md)) identified two major authorization flaws:
+  1. All 21 analytical dashboard views in `dashboard/views.py` inherited directly from `TemplateView` without authentication, publicly exposing institutional analytics, internal author rankings, and department metrics to anonymous internet traffic.
+  2. The `CustomUser.role` field (`admin`, `user`, `viewer`) was defined in `accounts/models.py` but completely unenforced in view logic. Any user with a read-only `"viewer"` account could access Web of Science file upload, review, and database persistence routes.
+  3. `wos_success` lacked even the `@login_required` decorator present on other ingestion routes.
+
+- **Decision**:
+  1. **Authenticate Dashboard Endpoints**:
+     - Apply Django's `LoginRequiredMixin` across all 21 class-based views in `dashboard/views.py`.
+     - Unauthenticated requests safely redirect to `accounts:login` (`/accounts/login/?next=...`).
+  2. **Preserve Public Institutional Showcase**:
+     - Keep the public publication catalog (`publications:list` and `publications:publication_detail`) and authentication entry points (`accounts:login`, password reset) publicly accessible without login.
+  3. **Role-Based Access Control (RBAC) Module**:
+     - Introduce `accounts/permissions.py` with `has_role`, `@role_required(*allowed_roles)`, and `RoleRequiredMixin`.
+     - Restrict Web of Science ingestion endpoints (`wos_upload`, `wos_review`, `wos_save`, `wos_success`) strictly to `admin` and `user` roles (plus staff and superusers).
+     - Enforce HTTP 403 Forbidden on the server side when `viewer` role users attempt to access or modify data via WoS ingestion endpoints.
+  4. **UI Defense-in-Depth**:
+     - Hide the "+ Upload WoS File" action in `publications_list.html` for anonymous visitors and `viewer` accounts.
+
+- **Alternatives Considered**:
+  - **Full site authentication (protecting `/publications/` as well)**: Rejected because institutional libraries typically require a public catalog showcase for citation and researcher discovery.
+  - **Django group-based permissions (`django.contrib.auth.models.Group`)**: Evaluated, but `CustomUser.role` already provides a clean, existing 3-tier enum (`admin`, `user`, `viewer`) matching project requirements. Standardizing enforcement on this existing model attribute is simpler and zero-overhead.
+
+- **Consequences**:
+  - **Positive**:
+    - Sensitive analytical dashboards are protected behind authentication.
+    - Read-only `viewer` accounts cannot upload or commit data to the repository.
+    - Zero permission bypass via `wos_success`.
+  - **Negative / Trade-offs**:
+    - Anonymous users visiting `/` or `/dashboard/` are prompted to log in.
+
+---
+
 ## Open Questions Affecting Implementation
 
 The following institutional and operational questions directly impact future remediation steps and must be aligned with project stakeholders:
 
 1. **Dashboard Visibility & Access Control Policy**:
-   - *Question*: Are the 21 analytical dashboard views intended to be publicly accessible as an institutional research showcase, or must they be restricted to authenticated RRI staff?
-   - *Implementation Impact*: Governs whether `LoginRequiredMixin` should be applied globally across `dashboard/views.py` or scoped conditionally.
+   - *Status*: **Resolved by D-005**. All 21 dashboard views require authentication via `LoginRequiredMixin`, while the publication list and detail views remain public.
 
 2. **Production Hosting Environment & Web Server**:
    - *Question*: Will the production environment be hosted on virtual machines running Apache (`mod_wsgi`) as implied by `makefile`, or on Nginx + Gunicorn/Uvicorn, or containerized via Docker?

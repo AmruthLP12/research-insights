@@ -8,13 +8,14 @@ from publications.models import (
     Author,
     AuthorAffiliation,
 )
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 from urllib.parse import unquote
 
 
-class DashboardHomeView(TemplateView):
+class DashboardHomeView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/dashboard.html"
 
     # -----------------------
@@ -107,7 +108,7 @@ class DashboardHomeView(TemplateView):
 # =====================================================
 # DOCUMENT TYPES
 # =====================================================
-class DocumentTypesView(TemplateView):
+class DocumentTypesView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/document_types.html"
 
     paginate_by = 10
@@ -196,7 +197,7 @@ class DocumentTypesView(TemplateView):
         return context
 
 
-class DocumentTypeDetailView(TemplateView):
+class DocumentTypeDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/document_type_detail.html"
 
     paginate_by = 10
@@ -269,7 +270,7 @@ class DocumentTypeDetailView(TemplateView):
 # =====================================================
 
 
-class AuthorsView(TemplateView):
+class AuthorsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/authors.html"
 
     paginate_by = 10
@@ -557,7 +558,7 @@ class AuthorsView(TemplateView):
         return context
 
 
-class AuthorDetailView(TemplateView):
+class AuthorDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/author_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -632,7 +633,7 @@ class AuthorDetailView(TemplateView):
 # =====================================================
 # JOURNALS
 # =====================================================
-class JournalsView(TemplateView):
+class JournalsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/journals.html"
 
     paginate_by = 10
@@ -773,7 +774,7 @@ class JournalsView(TemplateView):
         return context
 
 
-class JournalDetailView(TemplateView):
+class JournalDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/journal_detail.html"
     paginate_by = 10
 
@@ -841,7 +842,7 @@ class JournalDetailView(TemplateView):
 # =====================================================
 # DEPARTMENTS
 # =====================================================
-class DepartmentsView(TemplateView):
+class DepartmentsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/departments.html"
 
     paginate_by = 10
@@ -986,7 +987,7 @@ class DepartmentsView(TemplateView):
         return context
 
 
-class DepartmentDetailView(TemplateView):
+class DepartmentDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/department_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -1052,7 +1053,7 @@ class DepartmentDetailView(TemplateView):
 # =====================================================
 # COLLABORATION OVERVIEW
 # =====================================================
-class CollaborationView(TemplateView):
+class CollaborationView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/collaboration.html"
 
     paginate_by = 10
@@ -1155,7 +1156,7 @@ class CollaborationView(TemplateView):
         return context
 
 
-class CollaborationDetailView(TemplateView):
+class CollaborationDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/collaboration_detail.html"
 
     paginate_by = 10
@@ -1219,7 +1220,7 @@ class CollaborationDetailView(TemplateView):
 # =====================================================
 # COUNTRY COLLABORATION
 # =====================================================
-class CountryCollaborationView(TemplateView):
+class CountryCollaborationView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/country_collaboration.html"
 
     paginate_by = 10
@@ -1352,7 +1353,7 @@ class CountryCollaborationView(TemplateView):
         return context
 
 
-class CountryCollaborationDetailView(TemplateView):
+class CountryCollaborationDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/country_collaboration_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -1414,7 +1415,7 @@ class CountryCollaborationDetailView(TemplateView):
 # =====================================================
 # INSTITUTION COLLABORATION
 # =====================================================
-class InstitutionCollaborationView(TemplateView):
+class InstitutionCollaborationView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/institution_collaboration.html"
 
     paginate_by = 10
@@ -1544,7 +1545,7 @@ class InstitutionCollaborationView(TemplateView):
         return context
 
 
-class InstitutionCollaborationDetailView(TemplateView):
+class InstitutionCollaborationDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/institution_collaboration_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -1606,7 +1607,7 @@ class InstitutionCollaborationDetailView(TemplateView):
 # =====================================================
 # PUBLICATION TRENDS
 # =====================================================
-class TrendsView(TemplateView):
+class TrendsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/trends.html"
 
     search_fields = [
@@ -1699,7 +1700,7 @@ class TrendsView(TemplateView):
         return context
 
 
-class TrendYearDetailView(TemplateView):
+class TrendYearDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/trend_year_detail.html"
 
     paginate_by = 10
@@ -1763,7 +1764,7 @@ class TrendYearDetailView(TemplateView):
 # =====================================================
 # IMPACT ANALYSIS
 # =====================================================
-class ImpactView(TemplateView):
+class ImpactView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/impact.html"
 
     # Used by DynamicFilter
@@ -1834,7 +1835,7 @@ class ImpactView(TemplateView):
         return context
 
 
-class ImpactDetailView(TemplateView):
+class ImpactDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/impact_detail.html"
 
     paginate_by = 10
@@ -1903,7 +1904,7 @@ class ImpactDetailView(TemplateView):
 # =====================================================
 # RRI ROLE
 # =====================================================
-class RRIRoleView(TemplateView):
+class RRIRoleView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/rri_role.html"
 
     paginate_by = 10
@@ -2049,7 +2050,7 @@ class RRIRoleView(TemplateView):
         return context
 
 
-class RRIRoleDetailView(TemplateView):
+class RRIRoleDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/rri_role_detail.html"
 
     paginate_by = 10

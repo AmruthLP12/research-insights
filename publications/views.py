@@ -10,6 +10,8 @@ from django.db import transaction
 from django.forms import modelformset_factory
 from django.urls import reverse
 
+from accounts.permissions import role_required
+
 from .forms import PublicationForm, AuthorForm
 from .models import Author, Journal, Affiliation, AuthorAffiliation, Publication
 from .utils.wos_parser import parse_wos_file
@@ -197,7 +199,7 @@ class PublicationDetailView(DetailView):
 # =====================================================
 # WOS UPLOAD
 # =====================================================
-@login_required
+@role_required("admin", "user")
 def wos_upload(request):
     if request.method == "POST" and request.FILES.get("wos_file"):
         records = parse_wos_file(request.FILES["wos_file"])
@@ -221,7 +223,7 @@ def wos_upload(request):
 # =====================================================
 # WOS REVIEW
 # =====================================================
-@login_required
+@role_required("admin", "user")
 def wos_review(request):
     records = request.session.get("wos_records", [])
     index = request.session.get("wos_index", 0)
@@ -300,7 +302,7 @@ def wos_review(request):
 # =====================================================
 # WOS SAVE
 # =====================================================
-@login_required
+@role_required("admin", "user")
 @transaction.atomic
 def wos_save(request):
     if request.method != "POST":
@@ -364,5 +366,6 @@ def wos_save(request):
 # =====================================================
 # SUCCESS
 # =====================================================
+@role_required("admin", "user")
 def wos_success(request):
     return render(request, "publications/wos_success.html")

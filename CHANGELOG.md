@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - 2026-10-24
+
+#### Task 5: Enforce Dashboard Authentication and Role-Based Authorization
+- **Dashboard Authentication Enforcement**:
+  - Protected all 21 class-based views in [`dashboard/views.py`](dashboard/views.py) with Django's `LoginRequiredMixin`.
+  - Unauthenticated access to `/dashboard/` and all drilldowns now redirects safely to `accounts:login` (`/accounts/login/?next=...`).
+  - Preserved public access to the institutional publications catalog (`publications:list`, `publications:publication_detail`) and authentication entry points (`accounts:login`, password reset).
+- **Role-Based Access Control (RBAC)**:
+  - Created [`accounts/permissions.py`](accounts/permissions.py) implementing `has_role`, `@role_required(*allowed_roles)` decorator, and `RoleRequiredMixin`.
+  - Secured Web of Science ingestion endpoints (`publications:wos_upload`, `publications:wos_review`, `publications:wos_save`, and `publications:wos_success`) in [`publications/views.py`](publications/views.py) requiring `admin` or `user` roles (or staff/superuser).
+  - Enforced server-side HTTP 403 Forbidden when authenticated users with insufficient permissions (`role="viewer"`) attempt to access or modify data via WoS endpoints.
+  - Updated [`templates/publications/publications_list.html`](templates/publications/publications_list.html) to conditionally render the "+ Upload WoS File" action only for users with upload permissions (`admin`, `user`, staff, superuser).
+- **Automated Security Test Suite**:
+  - Added unit and integration tests across [`accounts/tests.py`](accounts/tests.py), [`dashboard/tests.py`](dashboard/tests.py), and [`publications/tests.py`](publications/tests.py) (9 tests total, all passing).
+  - Verified anonymous user redirection across 11 core dashboard endpoints and 4 WoS endpoints.
+  - Verified 403 Forbidden enforcement on `viewer` accounts attempting WoS upload, review, save, and success routes.
+  - Verified authorized access (HTTP 200) for `admin` and `user` accounts on WoS upload, and `viewer` accounts on dashboard views.
+  - Verified UI conditional rendering of action controls based on role permissions.
+- **Files Modified / Created**:
+  - `accounts/permissions.py` (created)
+  - `dashboard/views.py` (modified)
+  - `publications/views.py` (modified)
+  - `templates/publications/publications_list.html` (modified)
+  - `accounts/tests.py` (modified)
+  - `dashboard/tests.py` (modified)
+  - `publications/tests.py` (modified)
+- **Remaining Security Gaps**:
+  - SSL/HTTPS and Secure Cookies (`SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_HSTS_SECONDS`) remain disabled for local HTTP development; must be enabled in production environments.
+  - `CASCADE` deletion on `Publication.created_by`: deleting a user deletes all publications uploaded by that user. Should be migrated to `SET_NULL` or `PROTECT` in a dedicated migration.
+  - Email SMTP backend for password resets remains unconfigured (causes 500 when users submit password reset form).
+
 ### Fixed - 2026-10-24
 
 #### Task 4: Configure STATIC_ROOT and Verify collectstatic
