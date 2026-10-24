@@ -195,3 +195,234 @@ class EmailAndSecurityConfigTestCase(TestCase):
 
         with patch.dict(os.environ, {"USE_X_FORWARDED_PROTO": "False"}):
             self.assertIsNone(get_secure_proxy_ssl_header())
+
+
+class AuthenticationWorkflowTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="active_user",
+            password="correct_password_123",
+            role="user",
+        )
+        self.inactive_user = User.objects.create_user(
+            username="inactive_user",
+            password="password123",
+            role="user",
+            is_active=False,
+        )
+
+    def test_login_page_renders_form(self):
+        response = self.client.get(reverse("accounts:login"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="username"')
+        self.assertContains(response, 'name="password"')
+
+    def test_login_successful_with_valid_credentials(self):
+        response = self.client.post(
+            reverse("accounts:login"),
+            {"username": "active_user", "password": "correct_password_123"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("_auth_user_id", self.client.session)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.id)
+
+    def test_login_with_remember_me_unchecked_sets_zero_expiry(self):
+        self.client.post(
+            reverse("accounts:login"),
+            {
+                "username": "active_user",
+                "password": "correct_password_123",
+                "remember_me": False,
+            },
+        )
+        # When remember_me is unchecked, session expiry is set to expire on browser close
+        self.assertTrue(self.client.session.get_expire_at_browser_close())
+
+    def test_login_failed_with_invalid_credentials(self):
+        response = self.client.post(
+            reverse("accounts:login"),
+            {"username": "active_user", "password": "wrong_password"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertContains(response, "Please enter a correct")
+
+    def test_login_inactive_user_fails(self):
+        response = self.client.post(
+            reverse("accounts:login"),
+            {"username": "inactive_user", "password": "password123"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_authenticated_user_accessing_login_redirects(self):
+        self.client.login(username="active_user", password="correct_password_123")
+        response = self.client.get(reverse("accounts:login"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_logout_view(self):
+        self.client.login(username="active_user", password="correct_password_123")
+        self.assertIn("_auth_user_id", self.client.session)
+
+        response = self.client.post(reverse("accounts:logout"))
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+
+class PasswordResetConfirmAndCompleteTestCase(TestCase):
+    def setUp(self):
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.encoding import force_bytes
+        from django.utils.http import urlsafe_base64_encode
+
+        self.user = User.objects.create_user(
+            username="reset_user",
+            email="reset@rri.res.in",
+            password="initial_password_123",
+            role="user",
+        )
+        self.token = default_token_generator.make_token(self.user)
+        self.uidb64 = urlsafe_base64_encode(force_bytes(self.user.pk))
+
+    def test_password_reset_confirm_valid_token_renders_form(self):
+        response = self.client.get(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": self.token},
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context.get("validlink"))
+        self.assertContains(response, 'name="new_password1"')
+
+    def test_password_reset_confirm_successful_submission(self):
+        # Initial GET to initialize session token and follow redirect to set-password
+        self.client.get(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": self.token},
+            )
+        )
+
+        response = self.client.post(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": "set-password"},
+            ),
+            {
+                "new_password1": "brand_new_secret_password_456!",
+                "new_password2": "brand_new_secret_password_456!",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:password_reset_complete"))
+
+        # Confirm password updated by logging in
+        login_success = self.client.login(
+            username="reset_user", password="brand_new_secret_password_456!"
+        )
+        self.assertTrue(login_success)
+
+    def test_password_reset_confirm_invalid_token(self):
+        response = self.client.get(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": "invalid-tampered-token"},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context.get("validlink"))
+        self.assertContains(response, "invalid or has expired")
+
+    def test_password_reset_token_cannot_be_reused(self):
+        from django.contrib.auth.tokens import default_token_generator
+
+        # Initial GET and POST to consume the token
+        self.client.get(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": self.token},
+            )
+        )
+        self.client.post(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": "set-password"},
+            ),
+            {
+                "new_password1": "brand_new_secret_password_456!",
+                "new_password2": "brand_new_secret_password_456!",
+            },
+        )
+
+        # Attempting to use the old token again fails
+        self.user.refresh_from_db()
+        self.assertFalse(default_token_generator.check_token(self.user, self.token))
+
+        response = self.client.get(
+            reverse(
+                "accounts:password_reset_confirm",
+                kwargs={"uidb64": self.uidb64, "token": self.token},
+            ),
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context.get("validlink"))
+
+
+class PasswordChangeWorkflowTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="change_user",
+            password="old_password_123",
+            role="user",
+        )
+
+    def test_password_change_requires_authentication(self):
+        response = self.client.get(reverse("accounts:password_change"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_password_change_renders_form(self):
+        self.client.login(username="change_user", password="old_password_123")
+        response = self.client.get(reverse("accounts:password_change"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="old_password"')
+        self.assertContains(response, 'name="new_password1"')
+
+    def test_password_change_successful(self):
+        self.client.login(username="change_user", password="old_password_123")
+        response = self.client.post(
+            reverse("accounts:password_change"),
+            {
+                "old_password": "old_password_123",
+                "new_password1": "updated_password_789!",
+                "new_password2": "updated_password_789!",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:password_change_done"))
+
+        # Follow redirect and verify password_change_done template renders without error
+        done_resp = self.client.get(reverse("accounts:password_change_done"))
+        self.assertEqual(done_resp.status_code, 200)
+        self.assertContains(done_resp, "Password Updated")
+
+        # Verify new password works
+        self.client.logout()
+        login_success = self.client.login(
+            username="change_user", password="updated_password_789!"
+        )
+        self.assertTrue(login_success)
+
+    def test_password_change_invalid_old_password(self):
+        self.client.login(username="change_user", password="old_password_123")
+        response = self.client.post(
+            reverse("accounts:password_change"),
+            {
+                "old_password": "wrong_password",
+                "new_password1": "updated_password_789!",
+                "new_password2": "updated_password_789!",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your old password was entered incorrectly.")

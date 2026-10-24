@@ -65,3 +65,25 @@ class DashboardAuthenticationTestCase(TestCase):
                 200,
                 f"Expected 200 OK for authenticated access to {url}",
             )
+
+    def test_dashboard_handles_publications_with_null_creator(self):
+        from publications.models import Publication
+
+        Publication.objects.create(
+            title="Publication With No Creator",
+            document_type="Journal Article",
+            date_published="2023-01-01",
+            collaboration_type="National",
+            journal=self.journal,
+            created_by=None,
+        )
+
+        self.client.login(username="viewer", password="password123")
+        home_resp = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(home_resp.status_code, 200)
+
+        docs_resp = self.client.get(reverse("dashboard:documents"))
+        self.assertEqual(docs_resp.status_code, 200)
+
+        trends_resp = self.client.get(reverse("dashboard:trends"))
+        self.assertEqual(trends_resp.status_code, 200)

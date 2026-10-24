@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Testing & Quality Assurance - 2026-10-24
+
+#### Task 7: Comprehensive Publication Workflow Testing and Security Regression Coverage
+- **Web of Science (WoS) Ingestion Workflow Test Suite**:
+  - **Upload Verification (`wos_upload`)**: Added tests for valid TSV file upload initializing session records (`wos_records`, `wos_index=0`) and redirecting to review.
+  - **Negative & Edge Cases**: Added tests for 0-byte empty files, header-only files without data rows, missing `wos_file` in POST, verifying appropriate validation error messages and absence of session corruption.
+  - **Review Page Verification (`wos_review`)**: Added tests verifying form initial data extraction, dynamic `Journal` creation/retrieval, `AuthorFormSet` pre-population (RRI affiliation heuristic setting internal vs external roles), decoded affiliations JSON, and redirection to upload if session is empty or index is out of bounds.
+  - **Persistence & Atomic Save (`wos_save`)**: Added tests verifying full database persistence of `Publication` (with `created_by=request.user`), `Author`, `Affiliation`, and `AuthorAffiliation`; session cleanup upon completion; multi-record files advancing `wos_index` iteratively; deduplication of existing `Journal` and `Affiliation` records; and author filtering via `DELETE=True`.
+  - **Transaction Rollback**: Verified invalid form submissions trigger atomic rollback, leave database unmodified (0 records created), and preserve session state.
+  - **Method Enforcement**: Verified GET requests to `wos_save` redirect to `wos_review`.
+- **Sensitive Endpoint Security & Role-Based Access Control**:
+  - Verified anonymous user redirection (302 to login) on GET and POST requests across all WoS endpoints (`wos_upload`, `wos_review`, `wos_save`, `wos_success`).
+  - Verified server-side 403 Forbidden enforcement on GET and POST requests for `viewer` role users across all WoS endpoints.
+  - Verified authorized access for `user` and `admin` roles, and staff/superuser role overrides for `viewer` accounts.
+- **Publication Retention & Data Integrity**:
+  - Verified `Publication.created_by` is set to `NULL` upon user account deletion, with all associated relationships (`authors`, `departments`, `journal`, `author_affiliations`, `yearly_citations`) remaining completely intact.
+  - Verified public publication list and detail views render publications with `created_by=None` without error.
+  - Verified dashboard aggregation views (`dashboard:home`, `dashboard:documents`, `dashboard:trends`) execute correctly with null creator publications.
+- **Public Publication Catalog & Detail Views**:
+  - `publications:list`: Verified empty database state (renders 0 counts cleanly without 500 error), pagination across multiple pages (10 items per page), keyword search (`?search=`), exact filters (`document_type`, `collaboration_type`), and ordering (`ordering=title`, `ordering=-title`).
+  - `publications:publication_detail`: Verified 200 OK rendering of comprehensive metadata (journal, authors, departments, affiliations, citations), 404 Not Found on invalid primary keys, and graceful rendering of minimal records lacking optional metadata.
+- **Authentication & Password Management Regressions**:
+  - Verified `accounts:login` GET renders form, POST logs in and checks session `_auth_user_id`, `remember_me` checkbox controls browser-close session expiry (`get_expire_at_browser_close()`), invalid credentials return form error, inactive users fail to authenticate, and authenticated users visiting login redirect.
+  - Verified `accounts:logout` clears user session.
+  - Verified password reset confirmation lifecycle: valid token redirects to `set-password` and renders form with `validlink=True`, POST updates password and redirects to `password_reset_complete`, user logs in with new password, invalid/tampered tokens render invalid link message, and tokens cannot be reused.
+  - Verified `accounts:password_change`: anonymous redirect to login, authenticated form rendering, successful password change redirecting to `password_change_done`, and invalid old password validation.
+  - Fixed latent broken URL reference `{% url 'dashboard' %}` in [`templates/registration/password_change_done.html`](templates/registration/password_change_done.html) to `{% url 'dashboard:home' %}`.
+- **Test Metrics**:
+  - Expanded total automated tests from 20 to **57 passing tests** across `accounts` (25 tests), `publications` (28 tests), and `dashboard` (4 tests).
+- **Files Modified**:
+  - `accounts/tests.py` (modified)
+  - `dashboard/tests.py` (modified)
+  - `publications/tests.py` (modified)
+  - `templates/registration/password_change_done.html` (modified)
+  - `CHANGELOG.md` (modified)
+
 ### Security & Reliability - 2026-10-24
 
 #### Task 6: Resolve Security Gaps: Publication Ownership, Password Reset Workflow, and Production Transport Security
