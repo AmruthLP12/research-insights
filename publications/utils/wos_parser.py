@@ -69,6 +69,8 @@ def parse_wos_file(file_obj):
         # -----------------------
         # Publication
         # -----------------------
+        article_number = row.get("AR") or row.get("ARTN") or ""
+
         publication = {
             "title": row.get("TI"),
             "journal_name": row.get("SO"),
@@ -77,6 +79,7 @@ def parse_wos_file(file_obj):
             "volume": row.get("VL"),
             "issue": row.get("IS"),
             "page_number": page_number,
+            "article_number": article_number,
             "doi": row.get("DI"),
         }
 

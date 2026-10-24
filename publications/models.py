@@ -145,6 +145,7 @@ class Publication(models.Model):
     volume = models.CharField(max_length=50, blank=True, null=True)
     issue = models.CharField(max_length=50, blank=True, null=True)
     page_number = models.CharField(max_length=50, blank=True, null=True)
+    article_number = models.CharField(max_length=50, blank=True, null=True)
     doi = models.CharField(max_length=255, blank=True, null=True)
 
     collaboration_type = models.CharField(
@@ -171,7 +172,7 @@ class Publication(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-date_published"]
+        ordering = ["-date_published", "title"]
 
     def __str__(self):
         return self.title

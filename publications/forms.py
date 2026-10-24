@@ -40,6 +40,7 @@ class PublicationForm(forms.ModelForm):
             "volume",
             "issue",
             "page_number",
+            "article_number",
             "doi",
             "collaboration_type",
         ]
@@ -53,6 +54,7 @@ class PublicationForm(forms.ModelForm):
             "volume": forms.TextInput(attrs={"class": TAILWIND_INPUT}),
             "issue": forms.TextInput(attrs={"class": TAILWIND_INPUT}),
             "page_number": forms.TextInput(attrs={"class": TAILWIND_INPUT}),
+            "article_number": forms.TextInput(attrs={"class": TAILWIND_INPUT}),
             "doi": forms.TextInput(attrs={"class": TAILWIND_INPUT}),
             "collaboration_type": forms.Select(attrs={"class": TAILWIND_SELECT}),
         }

@@ -90,7 +90,7 @@ class PublicationAdmin(admin.ModelAdmin):
                 "document_type",
                 "date_published",
                 "journal",
-                ("volume", "issue", "page_number"),
+                ("volume", "issue", "page_number", "article_number"),
                 "doi",
             )
         }),
