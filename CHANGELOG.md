@@ -11,6 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added - 2026-10-24
 
+#### Task 2: Secure Django Settings and Environment Configuration
+- **Environment-Driven Configuration**:
+  - Replaced hardcoded insecure settings in `rri_publications_dashboard/settings.py` with standard-library environment variable loading.
+  - Added lightweight `.env` parser reading `.env` from repository root if present, preserving existing OS environment variables, without introducing third-party dependencies (`django-environ`).
+  - Added explicit boolean parsing helper `_parse_bool` recognizing standard truthy/falsy values, defaulting safely to `False`.
+  - Added comma-separated list parsing helper `_parse_list` with whitespace stripping.
+- **Fail-Closed Security Protections**:
+  - `SECRET_KEY`: Resolved from `DJANGO_SECRET_KEY` or `SECRET_KEY`. In production (`DEBUG=False`), raises `django.core.exceptions.ImproperlyConfigured` if unset, shorter than 50 characters, or starts with `django-insecure-`. For local development (`DEBUG=True`), generates an ephemeral random secret key (`django-insecure-dev-...`) per process if none is provided.
+  - `DEBUG`: Environment-driven with default `False`. Enables `django_browser_reload` only when explicitly set to truthy values.
+  - `ALLOWED_HOSTS`: In production (`DEBUG=False`), requires a non-empty, comma-separated host list and strictly rejects wildcards (`*`) with `ImproperlyConfigured`. In development (`DEBUG=True`), defaults to `['localhost', '127.0.0.1', '[::1]']` merged with any user-configured hosts.
+- **Environment Template & Documentation**:
+  - Updated `.env.example` with clear comments explaining each security variable, development vs. production requirements, and security rules.
+  - Verified `.env` remains ignored by Git.
+- **Files Modified**:
+  - `rri_publications_dashboard/settings.py`
+  - `.env.example`
+- **Verification Performed**:
+  - `venv/bin/python manage.py check`: Passed with 0 issues.
+  - `venv/bin/python manage.py check --deploy`: Verified `security.W009` (SECRET_KEY) and `security.W018` (DEBUG) are completely eliminated.
+  - Boolean parsing matrix test: Verified `true`, `1`, `yes`, `t`, `on` evaluate to `True`; `false`, `0`, `no`, `f`, `off`, `""`, and random strings evaluate to `False`.
+  - Fail-closed tests (`DEBUG=False`):
+    - Missing `DJANGO_SECRET_KEY`: Verified `ImproperlyConfigured` raised.
+    - Insecure `DJANGO_SECRET_KEY` (`django-insecure-...` or `<50` chars): Verified `ImproperlyConfigured` raised.
+    - Empty `ALLOWED_HOSTS`: Verified `ImproperlyConfigured` raised.
+    - Wildcard `ALLOWED_HOSTS=*`: Verified `ImproperlyConfigured` raised.
+  - Development convenience tests (`DEBUG=True`):
+    - Unset secret key: Ephemeral dev key generated and allowed startup.
+    - Unset hosts: Defaulted to `['localhost', '127.0.0.1', '[::1]']`.
+  - `git diff --check`: 0 whitespace or formatting errors.
+- **Known Limitations & Remaining Issues**:
+  - `manage.py check --deploy` still reports 4 expected deployment warnings (`security.W004` SECURE_HSTS_SECONDS, `security.W008` SECURE_SSL_REDIRECT, `security.W012` SESSION_COOKIE_SECURE, `security.W016` CSRF_COOKIE_SECURE) which belong to downstream HTTPS/cookie hardening tasks.
+  - `STATIC_ROOT` remains unconfigured (identified in Task 1 audit baseline; to be addressed in subsequent static files remediation).
+
 #### Task 1: Establish Reliable Change and Decision Log
 - **Initial Tracking Setup**:
   - Established `CHANGELOG.md` to permanently record all remediation tasks, verified checks, affected files, and known limitations.

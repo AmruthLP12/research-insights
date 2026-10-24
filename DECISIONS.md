@@ -9,6 +9,7 @@ This document records the architectural, security, and engineering decisions mad
 | ID | Title | Date | Status |
 | :--- | :--- | :--- | :--- |
 | **[D-001](#d-001-incremental-remediation-workflow)** | Incremental Remediation Workflow and Evidence-Based Verification | 2026-10-24 | **Accepted** |
+| **[D-002](#d-002-environment-driven-security-settings-and-fail-closed-configuration)** | Environment-Driven Security Settings and Fail-Closed Configuration | 2026-10-24 | **Accepted** |
 
 ---
 
@@ -58,6 +59,45 @@ Because there is currently **0% automated test coverage**, attempting broad or c
   - **Alternatives Considered**: Other approaches evaluated and reasons for rejection.
   - **Consequences**: Positive benefits, trade-offs, and downstream impacts.
   ```
+
+---
+
+## D-002: Environment-Driven Security Settings and Fail-Closed Configuration
+
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**:
+  The initial security audit ([`07-authentication-authorization-and-security.md`](docs/project-audit/07-authentication-authorization-and-security.md)) identified that `rri_publications_dashboard/settings.py` had hardcoded `DEBUG = True`, a hardcoded `SECRET_KEY` starting with `django-insecure-`, and `ALLOWED_HOSTS = ['*']`. This opened the application to critical security vulnerabilities (session hijacking, cryptographic tampering, and Host-header injection) if deployed without modification.
+
+  Because the project had 0% automated test coverage, the solution needed to harden the application strictly against production misconfigurations while avoiding adding heavy dependencies (such as `django-environ` or `dynaconf`) that could disrupt existing local development workflows.
+
+- **Decision**:
+  1. **Zero External Dependencies for Configuration**:
+     - Implement environment loading using only Python's standard library (`os`, `pathlib.Path`, `secrets`).
+     - Parse `.env` files manually if present in the repository root without overwriting existing environment variables (allowing container or shell variables to take precedence).
+  2. **Fail-Closed Production Posture**:
+     - In production (`DEBUG=False`):
+       - `DJANGO_SECRET_KEY` is mandatory. The application refuses to start (`ImproperlyConfigured`) if it is missing, shorter than 50 characters, or starts with the default Django insecure prefix (`django-insecure-`).
+       - `ALLOWED_HOSTS` is mandatory. The application refuses to start if empty or if it contains a wildcard (`*`).
+  3. **Frictionless Local Development**:
+     - In development (`DEBUG=True`):
+       - If `DJANGO_SECRET_KEY` is not provided, Django generates a process-ephemeral random secret key (`django-insecure-dev-...`), allowing local developers and CI runners to start immediately without setup roadblocks.
+       - If `ALLOWED_HOSTS` is not provided, it defaults to safe local loopback interfaces (`localhost`, `127.0.0.1`, `[::1]`).
+  4. **Explicit Boolean Parsing**:
+     - `DEBUG` is parsed strictly against recognized string representations: `('true', '1', 'yes', 't', 'on')` evaluates to `True`; anything else evaluates to `False`. Defaults to `False` if unset.
+
+- **Alternatives Considered**:
+  - **Add `django-environ` or `python-dotenv`**: Rejected to avoid modifying `requirements.txt` prematurely and introducing dependency management overhead for a task that standard library code cleanly satisfies in under 30 lines.
+  - **Fail local development if `DJANGO_SECRET_KEY` is unset**: Evaluated, but generating an ephemeral key for `DEBUG=True` avoids breaking quick setup, new developer onboarding, and ad-hoc local testing while preserving absolute strictness when `DEBUG=False`.
+  - **Allow `ALLOWED_HOSTS = ['*']` in development**: Rejected; restricting development defaults to loopback (`localhost`, `127.0.0.1`, `[::1]`) while allowing comma-separated host additions prevents DNS rebinding vulnerabilities even on local workstations.
+
+- **Consequences**:
+  - **Positive**:
+    - `security.W009` (`SECRET_KEY`) and `security.W018` (`DEBUG`) warnings from `manage.py check --deploy` are resolved.
+    - Accidental production deployment with default debug mode or wildcard hosts is impossible; startup crashes immediately with explicit configuration errors.
+    - Zero changes to `requirements.txt` or third-party packages.
+  - **Negative / Trade-offs**:
+    - Production deployments must explicitly provide valid `DJANGO_SECRET_KEY` (min 50 chars) and `ALLOWED_HOSTS` environment variables or `.env` files.
 
 ---
 
