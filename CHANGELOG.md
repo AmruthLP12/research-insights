@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed - 2026-10-24
+
+#### Task 3: Restore the Missing Publication.article_number Model Field
+- **Model & Schema Reconciliation**:
+  - Restored `article_number = models.CharField(max_length=50, blank=True, null=True)` to `Publication` in [`publications/models.py`](publications/models.py), matching applied migration `0002_alter_publication_options_publication_article_number.py` and the existing `db.sqlite3` column definition.
+  - Reconciled `Publication.Meta.ordering = ["-date_published", "title"]` with migration `0002`, eliminating all schema drift detected by Django.
+  - No new migration was required; `makemigrations --check --dry-run` reports zero changes.
+- **Workflow & Interface Integration**:
+  - Registered `article_number` in `PublicationForm` ([`publications/forms.py`](publications/forms.py)) with Tailwind styling.
+  - Added `article_number` to Django Admin `PublicationAdmin.fieldsets` metadata section ([`publications/admin.py`](publications/admin.py)).
+  - Updated Web of Science parser ([`publications/utils/wos_parser.py`](publications/utils/wos_parser.py)) to populate `article_number` from `AR` / `ARTN` tags.
+  - Updated review workflow initial form binding ([`publications/views.py`](publications/views.py)) to propagate parsed article numbers into `PublicationForm`.
+- **Files Modified**:
+  - `publications/models.py`
+  - `publications/forms.py`
+  - `publications/admin.py`
+  - `publications/utils/wos_parser.py`
+  - `publications/views.py`
+- **Verification Performed**:
+  - `venv/bin/python manage.py check`: Passed with 0 issues.
+  - `venv/bin/python manage.py makemigrations --check --dry-run`: Passed (`No changes detected`).
+  - `venv/bin/python manage.py showmigrations`: Confirmed all migrations applied up to `publications.0002`.
+  - Focused field test suite (`scratch/test_article_number.py`):
+    - Verified field attributes: `CharField(max_length=50, blank=True, null=True)`.
+    - Verified ORM query compilation references `article_number`.
+    - Verified `PublicationForm` validation and clean data mapping.
+    - Verified `wos_parser` parses `AR` tag to `article_number`.
+    - Verified SQLite database schema `publications_publication` table structure.
+  - `venv/bin/python manage.py test`: Ran with 0 errors.
+  - `git diff --check`: 0 whitespace or formatting errors.
+- **Limitations & Known Concerns**:
+  - Existing database currently contains 0 publication records (`SELECT COUNT(*) FROM publications_publication` returned 0). Verified that the schema column exists and matches expected definitions.
+
 ### Changed - 2026-10-24
 
 #### Task 2.2: Refactor Django Environment Configuration into env.py

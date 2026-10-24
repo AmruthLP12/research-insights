@@ -250,6 +250,7 @@ def wos_review(request):
             "volume": pub.get("volume"),
             "issue": pub.get("issue"),
             "page_number": pub.get("page_number"),
+            "article_number": pub.get("article_number"),
             "doi": pub.get("doi"),
             "collaboration_type": pub.get("collaboration_type"),
         }
