@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### UI/UX Audit & Redesign Planning - 2026-10-25
+
+#### Step 10: Whole-Project UI/UX Audit and Redesign Plan
+- **Application-Wide Route & Page Inventory**:
+  - Cataloged all 38 user-facing routes across `accounts` (8), `publications` (7), `dashboard` (21), root redirect (1), and admin (1).
+  - Documented view handlers, HTTP methods, access permissions, primary templates, interactive elements (tables, 24 inline Chart.js scripts, forms, filter bars), and empty/error states.
+- **Defect Discovery & Evidence Verification**:
+  - Documented 10 confirmed functional defects (reproduced via runtime and code analysis):
+    - `F-01` (P1): `pagination.html` drops all active filter query parameters (`document_type`, `collaboration_type`, etc.) during page navigation.
+    - `F-02` (P1): `dashboard/urls.py` route for document types crashes with `NoReverseMatch` 500 error on `"Book/Book Chapter"`.
+    - `F-03` (P1): `dashboard/urls.py` author route crashes with `NoReverseMatch` on mononyms and blank first names.
+    - `F-04` (P1): `dashboard/urls.py` RRI role route crashes with `NoReverseMatch` on blank or unassigned roles.
+    - `F-05` (P1): `JournalDetailView` crashes with HTTP 500 (`ValueError`) when publications lack a journal (`journal=None`).
+    - `F-06` (P2): `base.html` has malformed duplicate `<!doctype html>`, `<html lang="en">`, and `</html>` structural wrappers.
+    - `F-07` (P1): `publication_detail.html` references non-existent model fields (`abstract`, `full_text_url`, `citation`) while omitting real `yearly_citations` data.
+    - `F-08` (P2): `publications_list.html` loads Chart.js from an external public CDN (`cdn.jsdelivr.net`), bypassing local static assets.
+    - `F-09` (P3): `impact_table.html` has table empty state `colspan="5"` mismatch against 6 `<thead>` columns.
+    - `F-10` (P2): `base.html` unconditionally renders authenticated dashboard sidebar on public auth pages (`/accounts/login/`, `/accounts/password_reset/`).
+  - Documented 3 code-established issues: relative reset link in `filter_bar.html` (`F-11`), orphaned templates (`F-12`), and missing custom `404.html`/`403.html`/`500.html` error pages (`F-13`).
+- **Visual Design Audit & Design System Foundation**:
+  - Identified styling tri-furcation across DaisyUI v5 utilities, Tailwind v4 utility classes, and inline styles.
+  - Formulated target design system for light-themed research analytics: standardized Inter font scale, semantic Slate/Navy color palette, flat page headers, unified card containers, accessible form controls, and centralized `chart-theme.js`.
+- **Comprehensive Remediation Roadmap & Backlog**:
+  - Produced `UI_UX_AUDIT.md` containing an actionable backlog of 21 prioritized tasks across 4 implementation batches:
+    - *Batch 1*: Critical functional fixes and routing reliability (URL converters, pagination parameters, model field alignment).
+    - *Batch 2*: Layout architecture, global styling, error templates, and shared chart configuration.
+    - *Batch 3*: Core views redesign (Dashboard home, publications list/detail, WoS workflow harmonization).
+    - *Batch 4*: Analytical detail views, author profiles, table standardization, and accessibility polish.
+
+
 ### Ingestion Workflow & User Experience - 2026-10-25
 
 #### Step 9: Improve the Web of Science Import Workflow and User Experience
