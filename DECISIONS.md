@@ -12,6 +12,9 @@ This document records the architectural, security, and engineering decisions mad
 | **[D-002](#d-002-environment-driven-security-settings-and-fail-closed-configuration)** | Environment-Driven Security Settings and Fail-Closed Configuration | 2026-10-24 | **Accepted** |
 | **[D-003](#d-003-settings-module-refactoring-and-strict-environment-validation)** | Settings Module Refactoring and Strict Environment Validation | 2026-10-24 | **Accepted** |
 | **[D-004](#d-004-separation-of-environment-helpers-into-envpy)** | Separation of Environment Helpers into Dedicated env.py Module | 2026-10-24 | **Accepted** |
+| **[D-005](#d-005-dashboard-authentication-and-role-based-access-control)** | Dashboard Authentication and Role-Based Access Control | 2026-10-24 | **Accepted** |
+| **[D-006](#d-006-publication-ownership-retention-password-reset-workflow-and-production-security-hardening)** | Publication Ownership Retention, Password Reset Workflow, and Production Security Hardening | 2026-10-24 | **Accepted** |
+| **[D-007](#d-007-web-of-science-upload-hardening-file-size-limits-and-session-safety)** | Web of Science Upload Hardening, File Size Limits, and Session Safety | 2026-10-25 | **Accepted** |
 
 ---
 
@@ -174,13 +177,129 @@ Because there is currently **0% automated test coverage**, attempting broad or c
 
 ---
 
+## D-005: Dashboard Authentication and Role-Based Access Control
+
+- **Date**: 2026-10-24
+- **Status**: Accepted
+- **Context**:
+  The security audit ([`07-authentication-authorization-and-security.md`](docs/project-audit/07-authentication-authorization-and-security.md)) identified two major authorization flaws:
+  1. All 21 analytical dashboard views in `dashboard/views.py` inherited directly from `TemplateView` without authentication, publicly exposing institutional analytics, internal author rankings, and department metrics to anonymous internet traffic.
+  2. The `CustomUser.role` field (`admin`, `user`, `viewer`) was defined in `accounts/models.py` but completely unenforced in view logic. Any user with a read-only `"viewer"` account could access Web of Science file upload, review, and database persistence routes.
+  3. `wos_success` lacked even the `@login_required` decorator present on other ingestion routes.
+
+- **Decision**:
+  1. **Authenticate Dashboard Endpoints**:
+     - Apply Django's `LoginRequiredMixin` across all 21 class-based views in `dashboard/views.py`.
+     - Unauthenticated requests safely redirect to `accounts:login` (`/accounts/login/?next=...`).
+  2. **Preserve Public Institutional Showcase**:
+     - Keep the public publication catalog (`publications:list` and `publications:publication_detail`) and authentication entry points (`accounts:login`, password reset) publicly accessible without login.
+  3. **Role-Based Access Control (RBAC) Module**:
+     - Introduce `accounts/permissions.py` with `has_role`, `@role_required(*allowed_roles)`, and `RoleRequiredMixin`.
+     - Restrict Web of Science ingestion endpoints (`wos_upload`, `wos_review`, `wos_save`, `wos_success`) strictly to `admin` and `user` roles (plus staff and superusers).
+     - Enforce HTTP 403 Forbidden on the server side when `viewer` role users attempt to access or modify data via WoS ingestion endpoints.
+  4. **UI Defense-in-Depth**:
+     - Hide the "+ Upload WoS File" action in `publications_list.html` for anonymous visitors and `viewer` accounts.
+
+- **Alternatives Considered**:
+  - **Full site authentication (protecting `/publications/` as well)**: Rejected because institutional libraries typically require a public catalog showcase for citation and researcher discovery.
+  - **Django group-based permissions (`django.contrib.auth.models.Group`)**: Evaluated, but `CustomUser.role` already provides a clean, existing 3-tier enum (`admin`, `user`, `viewer`) matching project requirements. Standardizing enforcement on this existing model attribute is simpler and zero-overhead.
+
+- **Consequences**:
+  - **Positive**:
+    - Sensitive analytical dashboards are protected behind authentication.
+    - Read-only `viewer` accounts cannot upload or commit data to the repository.
+    - Zero permission bypass via `wos_success`.
+  - **Negative / Trade-offs**:
+    - Anonymous users visiting `/` or `/dashboard/` are prompted to log in.
+
+---
+
+## D-006: Publication Ownership Retention, Password Reset Workflow, and Production Security Hardening
+
+### Context
+Following the implementation of dashboard authentication and RBAC (D-005), three critical security and data-integrity gaps remained:
+1. **Accidental Publication Cascade Deletion**: `Publication.created_by` was defined with `on_delete=models.CASCADE`. Deleting any user account would irreversibly delete every publication ingested or authored by that user.
+2. **Password Reset Workflow Failures**: The password-reset template threw `TemplateSyntaxError: Invalid filter: 'add_class'` due to missing template filters. Furthermore, `accounts/urls.py` namespacing caused `NoReverseMatch` errors during password reset redirects and email dispatch. Additionally, the project lacked environment-driven email configuration for development console output and production SMTP delivery.
+3. **Transport Security & Cookie Policies**: The settings lacked environment toggles for `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, HSTS settings, and reverse-proxy header handling.
+
+### Decision
+
+1. **Protect Publication Records (`SET_NULL`)**:
+   - Change `Publication.created_by` to `on_delete=models.SET_NULL, null=True, blank=True` in `publications/models.py`.
+   - Apply Django migration `0003_alter_publication_created_by`. Deleting a user account sets `created_by` to `NULL` while retaining the full publication record, affiliations, and citations intact.
+
+2. **Repair and Standardize Password Reset Workflow**:
+   - Implement `add_class` filter in `accounts/templatetags/form_tags.py` and register `accounts.templatetags.form_tags` in `TEMPLATES[0]['OPTIONS']['builtins']` in `settings.py`. This resolves the template syntax error cleanly without adding third-party dependencies.
+   - Configure explicit namespaced `success_url` redirects (`accounts:password_reset_done`, `accounts:password_reset_complete`, `accounts:password_change_done`) in `accounts/urls.py`.
+   - Provide `templates/registration/password_reset_email.html` referencing `accounts:password_reset_confirm`.
+   - Prevent user enumeration by ensuring password reset requests for non-existent emails redirect silently to the success page without raising errors.
+
+3. **Environment-Driven Email Configuration**:
+   - In `rri_publications_dashboard/settings.py` and `rri_publications_dashboard/env.py`, set default email backend to `django.core.mail.backends.console.EmailBackend` in development (`DEBUG=True`) and `django.core.mail.backends.smtp.EmailBackend` in production (`DEBUG=False`).
+   - Implement strict fail-closed validation (`validate_email_config`): disallow simultaneous `EMAIL_USE_TLS` and `EMAIL_USE_SSL`, and require `EMAIL_HOST` in production.
+
+4. **Production Transport Security and Cookie Settings**:
+   - Add environment-driven toggles in `settings.py` for `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_SECONDS`, `SECURE_HSTS_INCLUDE_SUBDOMAINS`, and `SECURE_HSTS_PRELOAD`.
+   - Support reverse proxies (e.g., Nginx or Apache mod_wsgi terminate TLS) via `USE_X_FORWARDED_PROTO=True` mapping to `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')`.
+   - Keep development defaults permissive (HTTP-compatible) while allowing full compliance with `python manage.py check --deploy` in production.
+
+### Consequences
+- **Positive**:
+  - Publication records can never be accidentally erased through account deletion.
+  - Password reset functions end-to-end without template crashes or reverse URL errors.
+  - Development requires zero external SMTP setup (emails display in console).
+  - Production deployments can achieve zero warnings on `check --deploy` by setting standard environment variables.
+- **Negative / Trade-offs**:
+  - Nullable `created_by` foreign key requires views and templates to handle unowned publications gracefully (already handled by existing code).
+
+---
+
+## D-007: Web of Science Upload Hardening, File Size Limits, and Session Safety
+
+- **Date**: 2026-10-25
+- **Status**: Accepted
+- **Context**:
+  Security audit finding SEC-05 ([`07-authentication-authorization-and-security.md`](docs/project-audit/07-authentication-authorization-and-security.md)) identified unbounded file uploads and session table bloat in `/publications/wos/upload/`. `wos_upload` was reading uploaded files into memory without verifying `request.FILES["wos_file"].size`, accepting non-text files, and storing unlimited parsed publication dictionaries directly into `request.session["wos_records"]`. In an environment backed by SQLite, an adversarial or oversized file (e.g. 100+ MB) could exhaust server RAM or bloat the `django_session` table, locking SQLite during serialization.
+
+- **Decision**:
+  1. **Enforce Global & Ingestion Upload Memory Limits in Settings**:
+     - Configure `FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880` (5 MB) and `DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880` (5 MB) in `rri_publications_dashboard/settings.py` via `env.py:get_int`.
+     - Define `MAX_WOS_FILE_SIZE = 5242880` (5 MB) and `MAX_WOS_RECORDS = 500` configurable via environment variables in `.env.example`.
+  2. **View-Level Pre-Read Validation (`publications/views.py:wos_upload`)**:
+     - Validate `uploaded_file.size <= MAX_WOS_FILE_SIZE` *before* reading the file into memory.
+     - Enforce file extension check strictly permitting `.txt` or `.tsv`.
+     - Validate `uploaded_file.content_type`, rejecting non-text, binary, executable, and archive MIME types.
+     - Validate batch record count `len(records) <= MAX_WOS_RECORDS` *before* staging records into `request.session`.
+     - Handle parsing and stream exceptions cleanly with user-facing flash messages, redirecting safely without HTTP 500 errors.
+  3. **Parser Hardening (`publications/utils/wos_parser.py`)**:
+     - Support UTF-8 and UTF-8 with Byte Order Mark (`utf-8-sig`) to seamlessly process Windows exports (`Tab-delimited (Win)`).
+     - Increase `csv.field_size_limit` to support large bibliographic fields (e.g., extensive author addresses or cited references).
+     - Strictly validate headers: require mandatory `TI` (Title) and at least one standard Web of Science field tag (`SO`, `AF`, `AU`, `PY`, `UT`, `PT`, `DT`, `DI`, etc.). Return an empty list for non-WoS or malformed files.
+     - Filter out empty rows, summary lines, or EOF tags (e.g., `EF`) missing valid titles.
+  4. **Template Message Visibility (`templates/publications/upload.html`)**:
+     - Render Django flash messages (`messages`) in `upload.html` so validation rejections, format errors, and size warnings are prominently displayed to uploading staff.
+
+- **Alternatives Considered**:
+  - **Asynchronous Task Queue (Celery / Redis / Postgres)**: Deferred. For the institution's yearly volume (~100–300 papers per year, reviewed in small batches), a 5 MB / 500-record synchronous limit eliminates memory exhaustion and session bloat without adding infrastructure complexity.
+  - **Temporary Database Staging Table**: Considered for record staging instead of `request.session`. However, capping batches at 500 records keeps session payloads under ~200 KB in SQLite, cleanly resolving the immediate vulnerability without redesigning the multi-step review workflow.
+
+- **Consequences**:
+  - **Positive**:
+     - Resolves audit finding SEC-05.
+     - Server memory and SQLite session table are fully protected against unbounded uploads and DoS.
+     - Windows UTF-8 BOM exports are parsed cleanly without corrupted headers.
+     - Non-WoS files, binaries, oversized payloads, and malformed inputs fail closed with clear user messages.
+  - **Trade-offs**:
+     - Large multi-year historical exports (> 500 records or > 5 MB) must be exported in annual or departmental batches.
+
+---
+
 ## Open Questions Affecting Implementation
 
 The following institutional and operational questions directly impact future remediation steps and must be aligned with project stakeholders:
 
 1. **Dashboard Visibility & Access Control Policy**:
-   - *Question*: Are the 21 analytical dashboard views intended to be publicly accessible as an institutional research showcase, or must they be restricted to authenticated RRI staff?
-   - *Implementation Impact*: Governs whether `LoginRequiredMixin` should be applied globally across `dashboard/views.py` or scoped conditionally.
+   - *Status*: **Resolved by D-005**. All 21 dashboard views require authentication via `LoginRequiredMixin`, while the publication list and detail views remain public.
 
 2. **Production Hosting Environment & Web Server**:
    - *Question*: Will the production environment be hosted on virtual machines running Apache (`mod_wsgi`) as implied by `makefile`, or on Nginx + Gunicorn/Uvicorn, or containerized via Docker?
@@ -191,8 +310,7 @@ The following institutional and operational questions directly impact future rem
    - *Implementation Impact*: Governs whether to introduce database connection pooling, PostgreSQL-specific search features, and migration scripts.
 
 4. **Institutional Email Relay (SMTP)**:
-   - *Question*: What SMTP host, port, credentials, or transactional email service will be used for password resets?
-   - *Implementation Impact*: Determines how `EMAIL_BACKEND` and `.env` credentials should be structured for development vs. production.
+   - *Status*: **Resolved by D-006**. Application supports console backend for development and parameterized SMTP configuration via environment variables (`EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS`, `EMAIL_USE_SSL`, `DEFAULT_FROM_EMAIL`) in production.
 
 5. **Orphaned Manual Publication Templates**:
    - *Question*: Should the manual entry forms (`create_publication.html`, `edit_publication.html`) be wired up to new Create/Edit views, or are all publications strictly required to originate from Web of Science export files?

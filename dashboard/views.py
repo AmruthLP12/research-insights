@@ -1,5 +1,6 @@
-from django.db.models import Count, Avg, Sum, Max, Prefetch, Min
+from django.db.models import Count, Avg, Sum, Max, Prefetch, Min, Q
 from django.urls import reverse
+from django.http import Http404
 from dashboard.filters import DynamicFilter
 from publications.models import (
     Department,
@@ -8,13 +9,14 @@ from publications.models import (
     Author,
     AuthorAffiliation,
 )
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404
 from urllib.parse import unquote
 
 
-class DashboardHomeView(TemplateView):
+class DashboardHomeView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/dashboard.html"
 
     # -----------------------
@@ -107,7 +109,7 @@ class DashboardHomeView(TemplateView):
 # =====================================================
 # DOCUMENT TYPES
 # =====================================================
-class DocumentTypesView(TemplateView):
+class DocumentTypesView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/document_types.html"
 
     paginate_by = 10
@@ -196,7 +198,7 @@ class DocumentTypesView(TemplateView):
         return context
 
 
-class DocumentTypeDetailView(TemplateView):
+class DocumentTypeDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/document_type_detail.html"
 
     paginate_by = 10
@@ -204,7 +206,11 @@ class DocumentTypeDetailView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        document_type = self.kwargs["document_type"]
+        document_type = unquote(self.kwargs["document_type"])
+
+        valid_doc_types = {c[0] for c in Publication.DOC_TYPE_CHOICES}
+        if document_type not in valid_doc_types and not Publication.objects.filter(document_type=document_type).exists():
+            raise Http404(f"Document type '{document_type}' not found")
 
         publications = (
             Publication.objects.filter(document_type=document_type)
@@ -269,7 +275,7 @@ class DocumentTypeDetailView(TemplateView):
 # =====================================================
 
 
-class AuthorsView(TemplateView):
+class AuthorsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/authors.html"
 
     paginate_by = 10
@@ -557,23 +563,44 @@ class AuthorsView(TemplateView):
         return context
 
 
-class AuthorDetailView(TemplateView):
+class AuthorDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/author_detail.html"
 
     def get_context_data(self, **kwargs):
 
         context = super().get_context_data(**kwargs)
 
-        first_name = self.kwargs["first_name"]
-        last_name = self.kwargs["last_name"]
-
-        authors = Author.objects.filter(
-            first_name__iexact=first_name,
-            last_name__iexact=last_name,
-        ).prefetch_related(
-            "publications__journal",
-            "author_affiliations__affiliation",
-        )
+        if "pk" in self.kwargs:
+            author = get_object_or_404(Author, pk=self.kwargs["pk"])
+            first_name = author.first_name
+            last_name = author.last_name
+            if first_name:
+                authors = Author.objects.filter(
+                    first_name__iexact=first_name,
+                    last_name__iexact=last_name,
+                ).prefetch_related(
+                    "publications__journal",
+                    "author_affiliations__affiliation",
+                )
+            else:
+                authors = Author.objects.filter(
+                    first_name="",
+                    last_name__iexact=last_name,
+                ).prefetch_related(
+                    "publications__journal",
+                    "author_affiliations__affiliation",
+                )
+        else:
+            first_name = self.kwargs.get("first_name", "").strip()
+            last_name = self.kwargs.get("last_name", "").strip()
+            authors = Author.objects.filter(
+                first_name__iexact=first_name,
+                last_name__iexact=last_name,
+            ).prefetch_related(
+                "publications__journal",
+                "author_affiliations__affiliation",
+            )
+            author = authors.first()
 
         publications = (
             Publication.objects.filter(
@@ -600,10 +627,14 @@ class AuthorDetailView(TemplateView):
 
         avg_if = total_if / total_publications if total_publications else 0
 
+        display_name = f"{first_name} {last_name}".strip() or last_name or first_name or "Unknown Author"
+
         context.update(
             {
+                "author": author,
                 "first_name": first_name,
                 "last_name": last_name,
+                "display_name": display_name,
                 "authors": authors,
                 "publications": publications,
                 "affiliations": affiliations,
@@ -620,7 +651,7 @@ class AuthorDetailView(TemplateView):
                         "url": reverse("dashboard:authors"),
                     },
                     {
-                        "label": f"{first_name} {last_name}",
+                        "label": display_name,
                     },
                 ],
             }
@@ -632,7 +663,7 @@ class AuthorDetailView(TemplateView):
 # =====================================================
 # JOURNALS
 # =====================================================
-class JournalsView(TemplateView):
+class JournalsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/journals.html"
 
     paginate_by = 10
@@ -773,7 +804,7 @@ class JournalsView(TemplateView):
         return context
 
 
-class JournalDetailView(TemplateView):
+class JournalDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/journal_detail.html"
     paginate_by = 10
 
@@ -841,7 +872,7 @@ class JournalDetailView(TemplateView):
 # =====================================================
 # DEPARTMENTS
 # =====================================================
-class DepartmentsView(TemplateView):
+class DepartmentsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/departments.html"
 
     paginate_by = 10
@@ -986,7 +1017,7 @@ class DepartmentsView(TemplateView):
         return context
 
 
-class DepartmentDetailView(TemplateView):
+class DepartmentDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/department_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -1052,7 +1083,7 @@ class DepartmentDetailView(TemplateView):
 # =====================================================
 # COLLABORATION OVERVIEW
 # =====================================================
-class CollaborationView(TemplateView):
+class CollaborationView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/collaboration.html"
 
     paginate_by = 10
@@ -1155,7 +1186,7 @@ class CollaborationView(TemplateView):
         return context
 
 
-class CollaborationDetailView(TemplateView):
+class CollaborationDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/collaboration_detail.html"
 
     paginate_by = 10
@@ -1219,7 +1250,7 @@ class CollaborationDetailView(TemplateView):
 # =====================================================
 # COUNTRY COLLABORATION
 # =====================================================
-class CountryCollaborationView(TemplateView):
+class CountryCollaborationView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/country_collaboration.html"
 
     paginate_by = 10
@@ -1352,7 +1383,7 @@ class CountryCollaborationView(TemplateView):
         return context
 
 
-class CountryCollaborationDetailView(TemplateView):
+class CountryCollaborationDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/country_collaboration_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -1414,7 +1445,7 @@ class CountryCollaborationDetailView(TemplateView):
 # =====================================================
 # INSTITUTION COLLABORATION
 # =====================================================
-class InstitutionCollaborationView(TemplateView):
+class InstitutionCollaborationView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/institution_collaboration.html"
 
     paginate_by = 10
@@ -1544,7 +1575,7 @@ class InstitutionCollaborationView(TemplateView):
         return context
 
 
-class InstitutionCollaborationDetailView(TemplateView):
+class InstitutionCollaborationDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/institution_collaboration_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -1606,7 +1637,7 @@ class InstitutionCollaborationDetailView(TemplateView):
 # =====================================================
 # PUBLICATION TRENDS
 # =====================================================
-class TrendsView(TemplateView):
+class TrendsView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/trends.html"
 
     search_fields = [
@@ -1699,7 +1730,7 @@ class TrendsView(TemplateView):
         return context
 
 
-class TrendYearDetailView(TemplateView):
+class TrendYearDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/trend_year_detail.html"
 
     paginate_by = 10
@@ -1763,7 +1794,7 @@ class TrendYearDetailView(TemplateView):
 # =====================================================
 # IMPACT ANALYSIS
 # =====================================================
-class ImpactView(TemplateView):
+class ImpactView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/impact.html"
 
     # Used by DynamicFilter
@@ -1834,7 +1865,7 @@ class ImpactView(TemplateView):
         return context
 
 
-class ImpactDetailView(TemplateView):
+class ImpactDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/impact_detail.html"
 
     paginate_by = 10
@@ -1903,7 +1934,7 @@ class ImpactDetailView(TemplateView):
 # =====================================================
 # RRI ROLE
 # =====================================================
-class RRIRoleView(TemplateView):
+class RRIRoleView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/rri_role.html"
 
     paginate_by = 10
@@ -2028,7 +2059,9 @@ class RRIRoleView(TemplateView):
                 "rri_role_highest_impact": (summary["highest_impact_factor"] or 0),
                 # Top Role
                 "rri_role_top_name": (
-                    top_role["authors__rri_role"] if top_role else None
+                    top_role["authors__rri_role"]
+                    if (top_role and top_role.get("authors__rri_role"))
+                    else ("Unassigned" if top_role else None)
                 ),
                 "rri_role_top_count": (
                     top_role["total_publications"] if top_role else 0
@@ -2049,7 +2082,7 @@ class RRIRoleView(TemplateView):
         return context
 
 
-class RRIRoleDetailView(TemplateView):
+class RRIRoleDetailView(LoginRequiredMixin, TemplateView):
     template_name = "dashboard/rri_role_detail.html"
 
     paginate_by = 10
@@ -2058,14 +2091,42 @@ class RRIRoleDetailView(TemplateView):
         context = super().get_context_data(**kwargs)
 
         role = self.kwargs["role"]
+        valid_roles = set(dict(Author.RRI_ROLE_CHOICES).keys())
 
-        publications = (
-            Publication.objects.filter(authors__rri_role=role)
-            .select_related("journal")
-            .prefetch_related("authors", "departments")
-            .distinct()
-            .order_by("-date_published")
-        )
+        if role == "unassigned":
+            role_display = "Unassigned"
+            publications = (
+                Publication.objects.filter(
+                    Q(authors__rri_role__isnull=True) | Q(authors__rri_role="")
+                )
+                .select_related("journal")
+                .prefetch_related("authors", "departments")
+                .distinct()
+                .order_by("-date_published")
+            )
+            authors = (
+                Author.objects.filter(
+                    Q(rri_role__isnull=True) | Q(rri_role="")
+                )
+                .distinct()
+                .order_by("first_name", "last_name")
+            )
+        else:
+            if role not in valid_roles and not Author.objects.filter(rri_role=role).exists():
+                raise Http404(f"Role '{role}' is not a valid RRI role.")
+            role_display = role
+            publications = (
+                Publication.objects.filter(authors__rri_role=role)
+                .select_related("journal")
+                .prefetch_related("authors", "departments")
+                .distinct()
+                .order_by("-date_published")
+            )
+            authors = (
+                Author.objects.filter(rri_role=role)
+                .distinct()
+                .order_by("first_name", "last_name")
+            )
 
         paginator = Paginator(publications, self.paginate_by)
         page_obj = paginator.get_page(self.request.GET.get("page"))
@@ -2077,15 +2138,10 @@ class RRIRoleDetailView(TemplateView):
             highest_impact=Max("journal__impact_factor"),
         )
 
-        authors = (
-            Author.objects.filter(rri_role=role)
-            .distinct()
-            .order_by("first_name", "last_name")
-        )
-
         context.update(
             {
-                "role": role,
+                "role": role_display,
+                "is_unassigned": (role == "unassigned"),
                 "page_obj": page_obj,
                 "publications": page_obj,
                 "authors": authors,
@@ -2103,7 +2159,7 @@ class RRIRoleDetailView(TemplateView):
                         "url": reverse("dashboard:rri_role"),
                     },
                     {
-                        "label": role,
+                        "label": role_display,
                     },
                 ],
             }

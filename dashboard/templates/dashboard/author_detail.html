@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}{{ first_name }} {{ last_name }}{% endblock %}
+{% block title %}{{ display_name|default:last_name }}{% endblock %}
 
 {% block content %}
 
 <div class="space-y-8">
 
-    {% include "components/page_header.html" with icon="👤" title=first_name|add:" "|add:last_name subtitle="Author profile, affiliations and publication history." %}
+    {% include "components/page_header.html" with icon="👤" title=display_name|default:last_name subtitle="Author profile, affiliations and publication history." %}
 
     <div class="stats stats-vertical md:stats-horizontal shadow border border-base-300 w-full bg-base-100">
 
@@ -33,7 +33,7 @@
 
                         <tr>
                             <th>Name</th>
-                            <td>{{ first_name }} {{ last_name }}</td>
+                            <td>{{ display_name|default:last_name }}</td>
                         </tr>
 
                         <tr>

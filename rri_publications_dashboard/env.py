@@ -65,6 +65,19 @@ def get_bool(name: str, default: bool = False) -> bool:
     return parse_bool(name, os.environ.get(name), default=default)
 
 
+def get_int(name: str, default: int = 0) -> int:
+    """Retrieve an environment variable and parse it as an integer."""
+    raw = os.environ.get(name)
+    if raw is None or str(raw).strip() == "":
+        return default
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        raise ImproperlyConfigured(
+            f"Invalid integer value for environment variable '{name}': '{raw}'"
+        )
+
+
 def parse_list(value: str | None) -> list[str]:
     """Parse a comma-separated string into a trimmed, non-empty list of strings."""
     if not value:
@@ -125,7 +138,7 @@ def get_allowed_hosts(debug: bool = False) -> list[str]:
     parsed_hosts = parse_list(raw_hosts)
 
     if debug:
-        dev_hosts = ["localhost", "127.0.0.1", "[::1]"]
+        dev_hosts = ["localhost", "127.0.0.1", "[::1]", "testserver"]
         if parsed_hosts:
             return list(dict.fromkeys(parsed_hosts + dev_hosts))
         return dev_hosts
@@ -141,3 +154,36 @@ def get_allowed_hosts(debug: bool = False) -> list[str]:
         )
 
     return parsed_hosts
+
+
+def validate_email_config(
+    debug: bool,
+    backend: str,
+    host: str | None,
+    port: int,
+    use_tls: bool,
+    use_ssl: bool,
+) -> None:
+    """Validate email configuration parameters for conflicts and required values."""
+    if use_tls and use_ssl:
+        raise ImproperlyConfigured(
+            "EMAIL_USE_TLS and EMAIL_USE_SSL are mutually exclusive. Set only one to True."
+        )
+
+    if not (1 <= port <= 65535):
+        raise ImproperlyConfigured(
+            f"Invalid EMAIL_PORT: '{port}'. Port must be between 1 and 65535."
+        )
+
+    if not debug and "smtp" in backend.lower():
+        if not host:
+            raise ImproperlyConfigured(
+                "EMAIL_HOST environment variable is required in production when using the SMTP backend."
+            )
+
+
+def get_secure_proxy_ssl_header() -> tuple[str, str] | None:
+    """Return SECURE_PROXY_SSL_HEADER if USE_X_FORWARDED_PROTO is True, else None."""
+    if get_bool("USE_X_FORWARDED_PROTO", default=False):
+        return ("HTTP_X_FORWARDED_PROTO", "https")
+    return None

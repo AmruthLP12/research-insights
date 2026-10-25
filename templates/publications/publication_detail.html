@@ -59,17 +59,31 @@
                             {% endif %}
                         </p>
                     </div>
+                    <div>
+                        <span class="text-base-content/50">Volume / Issue</span>
+                        <p class="font-medium">
+                            {% if publication.volume or publication.issue %}
+                                Vol. {{ publication.volume|default:"—" }}, Issue {{ publication.issue|default:"—" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div>
+                        <span class="text-base-content/50">Pages / Article No.</span>
+                        <p class="font-medium">
+                            {% if publication.page_number or publication.article_number %}
+                                {% if publication.page_number %}pp. {{ publication.page_number }}{% endif %}
+                                {% if publication.page_number and publication.article_number %} / {% endif %}
+                                {% if publication.article_number %}Art. {{ publication.article_number }}{% endif %}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
-        {% if publication.abstract %}
-            <div class="card bg-base-100 shadow border border-base-300">
-                <div class="card-body">
-                    <h2 class="card-title">Abstract</h2>
-                    <p class="text-sm leading-relaxed text-base-content/80">{{ publication.abstract }}</p>
-                </div>
-            </div>
-        {% endif %}
         <div class="grid md:grid-cols-2 gap-6">
             <div class="card bg-base-100 shadow border border-base-300">
                 <div class="card-body">
@@ -116,24 +130,41 @@
                 </ul>
             </div>
         </div>
-        {% if publication.full_text_url or publication.citation %}
-            <div class="card bg-base-100 shadow border border-base-300">
-                <div class="card-body">
-                    <h2 class="card-title">Links</h2>
-                    <div class="flex flex-wrap gap-3">
-                        {% if publication.full_text_url %}
-                            <a href="{{ publication.full_text_url }}"
-                               target="_blank"
-                               class="btn btn-primary">Open Full Text</a>
-                        {% endif %}
-                        {% if publication.citation %}
-                            <a href="{{ publication.citation }}"
-                               target="_blank"
-                               class="btn btn-outline btn-primary">View Citation</a>
-                        {% endif %}
+        <div class="card bg-base-100 shadow border border-base-300">
+            <div class="card-body">
+                <h2 class="card-title flex items-center justify-between">
+                    <span>Yearly Citations</span>
+                    {% if citations %}
+                        <span class="text-xs font-normal text-base-content/60">{{ citations|length }} recorded year{{ citations|length|pluralize }}</span>
+                    {% endif %}
+                </h2>
+                {% if citations %}
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th class="text-center">Web of Science</th>
+                                    <th class="text-center">Google Scholar</th>
+                                    <th class="text-center">Scopus</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for citation in citations %}
+                                    <tr>
+                                        <td class="font-medium">{{ citation.year }}</td>
+                                        <td class="text-center">{{ citation.wos_citations }}</td>
+                                        <td class="text-center">{{ citation.gs_citations }}</td>
+                                        <td class="text-center">{{ citation.scopus_citations }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                </div>
+                {% else %}
+                    <p class="text-sm text-base-content/50">No yearly citation records recorded for this publication.</p>
+                {% endif %}
             </div>
-        {% endif %}
+        </div>
     </div>
 {% endblock %}

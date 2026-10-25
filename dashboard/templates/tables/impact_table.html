@@ -31,8 +31,12 @@
                         <tr>
                             <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                             <td>
-                                <a href="{% url 'dashboard:impact_detail' row.journal__id %}"
-                                   class="link link-primary">{{ row.journal__name|default:"Unknown Journal" }}</a>
+                                {% if row.journal__id %}
+                                    <a href="{% url 'dashboard:impact_detail' row.journal__id %}"
+                                       class="link link-primary">{{ row.journal__name|default:"Unknown Journal" }}</a>
+                                {% else %}
+                                    <span class="text-base-content/60 italic">{{ row.journal__name|default:"Unspecified Journal" }}</span>
+                                {% endif %}
                             </td>
                             <td class="text-center">
                                 <span class="badge badge-info badge-outline">{{ row.total_publications }}</span>
@@ -42,8 +46,12 @@
                                 <span class="badge badge-success">{{ row.average_impact_factor|floatformat:2 }}</span>
                             </td>
                             <td class="text-center">
-                                <a href="{% url 'dashboard:impact_detail' row.journal__id %}"
-                                   class="btn btn-sm btn-outline btn-primary">View</a>
+                                {% if row.journal__id %}
+                                    <a href="{% url 'dashboard:impact_detail' row.journal__id %}"
+                                       class="btn btn-sm btn-outline btn-primary">View</a>
+                                {% else %}
+                                    <span class="btn btn-sm btn-disabled">View</span>
+                                {% endif %}
                             </td>
                         </tr>
                     {% empty %}

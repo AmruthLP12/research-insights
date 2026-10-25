@@ -5,9 +5,11 @@
         <!-- Header + Filters -->
         <div class="space-y-6">
             {% include "components/page_header.html" with icon="📚" title="Publications Analysis" subtitle="Publication records, trends and impact analysis." %}
+            {% if request.user.is_authenticated and request.user.role in "admin user" or request.user.is_staff or request.user.is_superuser %}
             <div class="flex justify-end">
                 <a href="{% url 'publications:wos_upload' %}" class="btn btn-primary">+ Upload WoS File</a>
             </div>
+            {% endif %}
             {% include "components/filter_bar.html" %}
         </div>
         <!-- KPI -->
@@ -96,7 +98,6 @@
         </div>
     </div>
     {{ publication_trend_data|json_script:"publication-data" }}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
 

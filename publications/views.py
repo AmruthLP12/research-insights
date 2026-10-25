@@ -3,12 +3,15 @@
 import json
 from datetime import datetime
 
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.forms import modelformset_factory
 from django.urls import reverse
+
+from accounts.permissions import role_required
 
 from .forms import PublicationForm, AuthorForm
 from .models import Author, Journal, Affiliation, AuthorAffiliation, Publication
@@ -197,10 +200,52 @@ class PublicationDetailView(DetailView):
 # =====================================================
 # WOS UPLOAD
 # =====================================================
-@login_required
+@role_required("admin", "user")
 def wos_upload(request):
-    if request.method == "POST" and request.FILES.get("wos_file"):
-        records = parse_wos_file(request.FILES["wos_file"])
+    if request.method == "POST":
+        uploaded_file = request.FILES.get("wos_file")
+        if not uploaded_file:
+            messages.error(request, "Please select a Web of Science export file to upload.")
+            return render(request, "publications/upload.html")
+
+        # 1. Size check before reading into memory or parsing
+        max_file_size = getattr(settings, "MAX_WOS_FILE_SIZE", 5 * 1024 * 1024)
+        if uploaded_file.size > max_file_size:
+            max_mb = max_file_size // (1024 * 1024)
+            messages.error(
+                request,
+                f"The uploaded file exceeds the maximum allowed size of {max_mb} MB.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 2. File extension check (.txt or .tsv)
+        file_name = (uploaded_file.name or "").lower()
+        if not (file_name.endswith(".txt") or file_name.endswith(".tsv")):
+            messages.error(
+                request,
+                "Invalid file format. Please upload a tab-delimited text (.txt) or .tsv file exported from Web of Science.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 3. Content type check
+        content_type = (uploaded_file.content_type or "").lower()
+        disallowed_prefixes = (
+            "image/", "audio/", "video/", "application/pdf", "application/zip",
+            "application/x-", "application/msword", "application/vnd."
+        )
+        if any(content_type.startswith(p) for p in disallowed_prefixes):
+            messages.error(
+                request,
+                "Invalid file type. Only plain text or TSV files are allowed.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 4. Parse file safely
+        try:
+            records = parse_wos_file(uploaded_file)
+        except Exception as exc:
+            messages.error(request, f"Error processing Web of Science file: {exc}")
+            return redirect("publications:wos_upload")
 
         if not records:
             messages.error(
@@ -210,18 +255,38 @@ def wos_upload(request):
             )
             return redirect("publications:wos_upload")
 
+        # 5. Batch record count limit check before staging in session
+        max_records = getattr(settings, "MAX_WOS_RECORDS", 500)
+        if len(records) > max_records:
+            messages.error(
+                request,
+                f"The uploaded file contains {len(records)} records, which exceeds the maximum limit of "
+                f"{max_records} records per batch. Please upload smaller batches.",
+            )
+            return redirect("publications:wos_upload")
+
         request.session["wos_records"] = records
         request.session["wos_index"] = 0
 
         return redirect("publications:wos_review")
 
-    return render(request, "publications/upload.html")
+    max_file_size = getattr(settings, "MAX_WOS_FILE_SIZE", 5 * 1024 * 1024)
+    max_records = getattr(settings, "MAX_WOS_RECORDS", 500)
+    return render(
+        request,
+        "publications/upload.html",
+        {
+            "max_file_size_mb": max_file_size // (1024 * 1024),
+            "max_file_size_bytes": max_file_size,
+            "max_records": max_records,
+        },
+    )
 
 
 # =====================================================
 # WOS REVIEW
 # =====================================================
-@login_required
+@role_required("admin", "user")
 def wos_review(request):
     records = request.session.get("wos_records", [])
     index = request.session.get("wos_index", 0)
@@ -285,14 +350,21 @@ def wos_review(request):
         except Exception:
             form.affiliations_list = []
 
+    total_records = len(records)
+    current_index = index + 1
+    progress_percent = int((current_index / total_records) * 100) if total_records else 0
+
     return render(
         request,
         "publications/review.html",
         {
             "pub_form": pub_form,
             "author_formset": formset,
-            "index": index + 1,
-            "total": len(records),
+            "index": current_index,
+            "total": total_records,
+            "progress_percent": progress_percent,
+            "is_last_record": current_index >= total_records,
+            "remaining_count": max(0, total_records - current_index),
         },
     )
 
@@ -300,7 +372,7 @@ def wos_review(request):
 # =====================================================
 # WOS SAVE
 # =====================================================
-@login_required
+@role_required("admin", "user")
 @transaction.atomic
 def wos_save(request):
     if request.method != "POST":
@@ -320,9 +392,18 @@ def wos_save(request):
     formset = AuthorFormSet(request.POST, queryset=Author.objects.none())
 
     if not pub_form.is_valid() or not formset.is_valid():
-        messages.error(request, "Please correct the errors below.")
-        print(pub_form.errors)
-        print(formset.errors)
+        error_items = []
+        for field, errors in pub_form.errors.items():
+            name = "Departments" if field == "departments" else field.replace("_", " ").capitalize()
+            error_items.append(f"{name}: {', '.join(errors)}")
+        for i, form in enumerate(formset.forms):
+            for field, errors in form.errors.items():
+                error_items.append(f"Author #{i+1} {field.replace('_', ' ').capitalize()}: {', '.join(errors)}")
+
+        if error_items:
+            messages.error(request, f"Please correct the errors: {'; '.join(error_items)}")
+        else:
+            messages.error(request, "Please correct the errors below.")
         return redirect("publications:wos_review")
 
     publication = pub_form.save(commit=False)
@@ -354,15 +435,36 @@ def wos_save(request):
     request.session["wos_index"] = index + 1
 
     if request.session["wos_index"] >= len(records):
+        saved_count = len(records)
         request.session.pop("wos_records", None)
         request.session.pop("wos_index", None)
+        request.session["wos_saved_count"] = saved_count
+        messages.success(
+            request,
+            f"Successfully imported and saved {saved_count} publication{'s' if saved_count != 1 else ''}.",
+        )
         return redirect("publications:wos_success")
 
     return redirect("publications:wos_review")
 
 
 # =====================================================
+# WOS CANCEL
+# =====================================================
+@role_required("admin", "user")
+def wos_cancel(request):
+    """Discard staged records and return to upload."""
+    records = request.session.pop("wos_records", None)
+    request.session.pop("wos_index", None)
+    if records:
+        messages.info(request, f"Import cancelled. {len(records)} staged record(s) discarded.")
+    return redirect("publications:wos_upload")
+
+
+# =====================================================
 # SUCCESS
 # =====================================================
+@role_required("admin", "user")
 def wos_success(request):
-    return render(request, "publications/wos_success.html")
+    saved_count = request.session.pop("wos_saved_count", None)
+    return render(request, "publications/wos_success.html", {"saved_count": saved_count})
