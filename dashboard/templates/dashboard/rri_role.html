@@ -56,7 +56,7 @@
                             {% for row in page_obj %}
                                 <tr>
                                     <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
-                                    <td>{{ row.authors__rri_role|default:"Unknown" }}</td>
+                                    <td>{{ row.authors__rri_role|default:"Unassigned" }}</td>
                                     <td class="text-center">
                                         <span class="badge badge-primary badge-outline">{{ row.total_publications }}</span>
                                     </td>
@@ -66,8 +66,13 @@
                                     </td>
                                     <td class="text-center">{% widthratio row.total_publications rri_role_total_publications 100 %}%</td>
                                     <td class="text-center">
-                                        <a href="{% url 'dashboard:rri_role_detail' row.authors__rri_role %}"
-                                           class="btn btn-primary btn-xs">View</a>
+                                        {% if row.authors__rri_role %}
+                                            <a href="{% url 'dashboard:rri_role_detail' row.authors__rri_role %}"
+                                               class="btn btn-primary btn-xs">View</a>
+                                        {% else %}
+                                            <a href="{% url 'dashboard:rri_role_unassigned' %}"
+                                               class="btn btn-primary btn-xs">View</a>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% empty %}

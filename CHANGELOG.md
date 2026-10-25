@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Core Functional & Routing Fixes - 2026-10-25
+
+#### Step 11: Fix Core Functional and Routing Defects (Batch 1)
+- **Pagination Query Parameter Preservation (`TASK-P1-01`)**:
+  - Implemented reusable template tag `query_transform` in `dashboard/templatetags/dashboard_tags.py`.
+  - Updated `dashboard/templates/components/pagination.html` to preserve all active `request.GET` query parameters (filters, search terms, date ranges, sorting) during page navigation while updating only `page`.
+  - Handled repeated query parameters and clean parameter removal when empty values are passed.
+- **Document Type Routing for Slashes (`TASK-P1-02`)**:
+  - Replaced `<document_type>` with `<path:document_type>` in `dashboard/urls.py` (`dashboard:document_type_detail`).
+  - Added URL decoding (`unquote`) and validation against `Publication.DOC_TYPE_CHOICES` and existing records, returning HTTP 404 for invalid types.
+  - Enabled reliable URL reversing and resolving for valid document types containing slashes (e.g. `"Book/Book Chapter"`).
+- **Author Detail Primary Key Routing (`TASK-P1-03`)**:
+  - Added primary-key routing `dashboard/authors/<int:pk>/` (`dashboard:author_detail`) in `dashboard/urls.py`.
+  - Updated `authors_table.html` view action buttons to link via `author.pk`, reliably resolving mononyms and authors with blank first names.
+  - Preserved backward compatibility for named author URLs (`authors/<first_name>/<last_name>/`) for existing workflows.
+  - Added graceful 404 handling for nonexistent author IDs and malformed paths.
+- **Unassigned RRI Role Support (`TASK-P1-04`)**:
+  - Added dedicated route `dashboard/rri-role/unassigned/` (`dashboard:rri_role_unassigned`) in `dashboard/urls.py` to inspect authors and publications lacking assigned RRI roles.
+  - Updated `dashboard/templates/dashboard/rri_role.html` table rows to link null/empty roles to the unassigned drill-down view and named roles to `dashboard:rri_role_detail`.
+  - Enforced HTTP 404 for invalid or unrecognized RRI role routes in `RRIRoleDetailView`.
+- **Enforce Valid Journal Identifiers (`TASK-P1-05`)**:
+  - Replaced untyped `<journal_id>` converter with integer converter `<int:journal_id>` in `dashboard/urls.py` (`dashboard:journal_detail`).
+  - Guarded against null journal IDs in `journals.html` and `impact_table.html`, preventing generation of malformed `/dashboard/journal/None/` links.
+  - Ensured nonexistent journal IDs and non-integer URLs return HTTP 404 cleanly.
+- **Publication Detail Real Model Alignment (`TASK-P1-06`)**:
+  - Removed references to nonexistent model fields (`abstract`, `full_text_url`, `citation`) in `templates/publications/publication_detail.html`.
+  - Added accurate display for publication metadata: Volume, Issue, Page Number, and Article Number.
+  - Added dedicated Yearly Citations breakdown table rendering `yearly_citations` (Web of Science, Google Scholar, Scopus citations) with graceful empty states.
+- **Removal of Redundant External Chart.js CDN Script (`TASK-P1-07`)**:
+  - Removed duplicate external CDN script (`https://cdn.jsdelivr.net/npm/chart.js`) from `templates/publications/publications_list.html`.
+  - Ensured all publication list charts consume the local `static/js/chart.min.js` asset loaded in `base.html`.
+- **Regression Test Coverage & Verification**:
+  - Added 19 new tests in `dashboard/tests.py` (`Batch1RoutingAndFunctionalDefectsTestCase`) covering pagination query preservation, document type slash reversal, mononym author drill-downs, unassigned RRI roles, and journal integer converters.
+  - Added 4 new tests in `publications/tests.py` (`PublicationDetailAndAssetIntegrityTestCase`) covering metadata rendering, citation table display, missing citations empty state, and CDN removal.
+  - Full test suite expanded from 87 to 110 tests, all passing (0 failures, 0 errors in 133.3s).
+
+
 ### UI/UX Audit & Redesign Planning - 2026-10-25
 
 #### Step 10: Whole-Project UI/UX Audit and Redesign Plan

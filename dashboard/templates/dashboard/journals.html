@@ -57,7 +57,11 @@
                                 <tr>
                                     <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
                                     <td class="font-medium text-blue-500">
-                                        <a href="{% url 'dashboard:journal_detail' row.journal__id %}">{{ row.journal__name }}</a>
+                                        {% if row.journal__id %}
+                                            <a href="{% url 'dashboard:journal_detail' row.journal__id %}">{{ row.journal__name }}</a>
+                                        {% else %}
+                                            <span class="text-base-content/60 italic">{{ row.journal__name|default:"Unspecified Journal" }}</span>
+                                        {% endif %}
                                     </td>
                                     <td class="text-center">
                                         <span class="badge badge-primary badge-outline">{{ row.total_publications }}</span>
@@ -68,8 +72,12 @@
                                         <span class="badge badge-success badge-outline">{{ row.average_impact_factor|default:0|floatformat:2 }}</span>
                                     </td>
                                     <td class="text-center">
-                                        <a href="{% url 'dashboard:journal_detail' row.journal__id %}"
-                                           class="btn btn-sm btn-primary btn-outline">View</a>
+                                        {% if row.journal__id %}
+                                            <a href="{% url 'dashboard:journal_detail' row.journal__id %}"
+                                               class="btn btn-sm btn-primary btn-outline">View</a>
+                                        {% else %}
+                                            <span class="btn btn-sm btn-disabled">View</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% empty %}

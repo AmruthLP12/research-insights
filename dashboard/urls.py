@@ -7,11 +7,16 @@ urlpatterns = [
     path("", views.DashboardHomeView.as_view(), name="home"),
     path("documents/", views.DocumentTypesView.as_view(), name="documents"),
     path(
-        "document/<document_type>/",
+        "document/<path:document_type>/",
         views.DocumentTypeDetailView.as_view(),
         name="document_type_detail",
     ),
     path("authors/", views.AuthorsView.as_view(), name="authors"),
+    path(
+        "authors/<int:pk>/",
+        views.AuthorDetailView.as_view(),
+        name="author_detail",
+    ),
     path(
         "authors/<first_name>/<last_name>/",
         views.AuthorDetailView.as_view(),
@@ -19,7 +24,7 @@ urlpatterns = [
     ),
     path("journals/", views.JournalsView.as_view(), name="journals"),
     path(
-        "journal/<journal_id>/",
+        "journal/<int:journal_id>/",
         views.JournalDetailView.as_view(),
         name="journal_detail",
     ),
@@ -48,6 +53,12 @@ urlpatterns = [
         name="impact_detail",
     ),
     path("rri/role/", views.RRIRoleView.as_view(), name="rri_role"),
+    path(
+        "rri-role/unassigned/",
+        views.RRIRoleDetailView.as_view(),
+        kwargs={"role": "unassigned"},
+        name="rri_role_unassigned",
+    ),
     path(
         "rri-role/<path:role>/",
         views.RRIRoleDetailView.as_view(),

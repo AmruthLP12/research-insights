@@ -1,5 +1,6 @@
-from django.db.models import Count, Avg, Sum, Max, Prefetch, Min
+from django.db.models import Count, Avg, Sum, Max, Prefetch, Min, Q
 from django.urls import reverse
+from django.http import Http404
 from dashboard.filters import DynamicFilter
 from publications.models import (
     Department,
@@ -205,7 +206,11 @@ class DocumentTypeDetailView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        document_type = self.kwargs["document_type"]
+        document_type = unquote(self.kwargs["document_type"])
+
+        valid_doc_types = {c[0] for c in Publication.DOC_TYPE_CHOICES}
+        if document_type not in valid_doc_types and not Publication.objects.filter(document_type=document_type).exists():
+            raise Http404(f"Document type '{document_type}' not found")
 
         publications = (
             Publication.objects.filter(document_type=document_type)
@@ -565,16 +570,37 @@ class AuthorDetailView(LoginRequiredMixin, TemplateView):
 
         context = super().get_context_data(**kwargs)
 
-        first_name = self.kwargs["first_name"]
-        last_name = self.kwargs["last_name"]
-
-        authors = Author.objects.filter(
-            first_name__iexact=first_name,
-            last_name__iexact=last_name,
-        ).prefetch_related(
-            "publications__journal",
-            "author_affiliations__affiliation",
-        )
+        if "pk" in self.kwargs:
+            author = get_object_or_404(Author, pk=self.kwargs["pk"])
+            first_name = author.first_name
+            last_name = author.last_name
+            if first_name:
+                authors = Author.objects.filter(
+                    first_name__iexact=first_name,
+                    last_name__iexact=last_name,
+                ).prefetch_related(
+                    "publications__journal",
+                    "author_affiliations__affiliation",
+                )
+            else:
+                authors = Author.objects.filter(
+                    first_name="",
+                    last_name__iexact=last_name,
+                ).prefetch_related(
+                    "publications__journal",
+                    "author_affiliations__affiliation",
+                )
+        else:
+            first_name = self.kwargs.get("first_name", "").strip()
+            last_name = self.kwargs.get("last_name", "").strip()
+            authors = Author.objects.filter(
+                first_name__iexact=first_name,
+                last_name__iexact=last_name,
+            ).prefetch_related(
+                "publications__journal",
+                "author_affiliations__affiliation",
+            )
+            author = authors.first()
 
         publications = (
             Publication.objects.filter(
@@ -601,10 +627,14 @@ class AuthorDetailView(LoginRequiredMixin, TemplateView):
 
         avg_if = total_if / total_publications if total_publications else 0
 
+        display_name = f"{first_name} {last_name}".strip() or last_name or first_name or "Unknown Author"
+
         context.update(
             {
+                "author": author,
                 "first_name": first_name,
                 "last_name": last_name,
+                "display_name": display_name,
                 "authors": authors,
                 "publications": publications,
                 "affiliations": affiliations,
@@ -621,7 +651,7 @@ class AuthorDetailView(LoginRequiredMixin, TemplateView):
                         "url": reverse("dashboard:authors"),
                     },
                     {
-                        "label": f"{first_name} {last_name}",
+                        "label": display_name,
                     },
                 ],
             }
@@ -2029,7 +2059,9 @@ class RRIRoleView(LoginRequiredMixin, TemplateView):
                 "rri_role_highest_impact": (summary["highest_impact_factor"] or 0),
                 # Top Role
                 "rri_role_top_name": (
-                    top_role["authors__rri_role"] if top_role else None
+                    top_role["authors__rri_role"]
+                    if (top_role and top_role.get("authors__rri_role"))
+                    else ("Unassigned" if top_role else None)
                 ),
                 "rri_role_top_count": (
                     top_role["total_publications"] if top_role else 0
@@ -2059,14 +2091,42 @@ class RRIRoleDetailView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
 
         role = self.kwargs["role"]
+        valid_roles = set(dict(Author.RRI_ROLE_CHOICES).keys())
 
-        publications = (
-            Publication.objects.filter(authors__rri_role=role)
-            .select_related("journal")
-            .prefetch_related("authors", "departments")
-            .distinct()
-            .order_by("-date_published")
-        )
+        if role == "unassigned":
+            role_display = "Unassigned"
+            publications = (
+                Publication.objects.filter(
+                    Q(authors__rri_role__isnull=True) | Q(authors__rri_role="")
+                )
+                .select_related("journal")
+                .prefetch_related("authors", "departments")
+                .distinct()
+                .order_by("-date_published")
+            )
+            authors = (
+                Author.objects.filter(
+                    Q(rri_role__isnull=True) | Q(rri_role="")
+                )
+                .distinct()
+                .order_by("first_name", "last_name")
+            )
+        else:
+            if role not in valid_roles and not Author.objects.filter(rri_role=role).exists():
+                raise Http404(f"Role '{role}' is not a valid RRI role.")
+            role_display = role
+            publications = (
+                Publication.objects.filter(authors__rri_role=role)
+                .select_related("journal")
+                .prefetch_related("authors", "departments")
+                .distinct()
+                .order_by("-date_published")
+            )
+            authors = (
+                Author.objects.filter(rri_role=role)
+                .distinct()
+                .order_by("first_name", "last_name")
+            )
 
         paginator = Paginator(publications, self.paginate_by)
         page_obj = paginator.get_page(self.request.GET.get("page"))
@@ -2078,15 +2138,10 @@ class RRIRoleDetailView(LoginRequiredMixin, TemplateView):
             highest_impact=Max("journal__impact_factor"),
         )
 
-        authors = (
-            Author.objects.filter(rri_role=role)
-            .distinct()
-            .order_by("first_name", "last_name")
-        )
-
         context.update(
             {
-                "role": role,
+                "role": role_display,
+                "is_unassigned": (role == "unassigned"),
                 "page_obj": page_obj,
                 "publications": page_obj,
                 "authors": authors,
@@ -2104,7 +2159,7 @@ class RRIRoleDetailView(LoginRequiredMixin, TemplateView):
                         "url": reverse("dashboard:rri_role"),
                     },
                     {
-                        "label": role,
+                        "label": role_display,
                     },
                 ],
             }

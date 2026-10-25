@@ -1084,3 +1084,94 @@ class WoSImportWorkflowAndUXTestCase(TestCase):
         self.assertContains(resp, reverse("publications:list"))
         self.assertContains(resp, reverse("dashboard:home"))
         self.assertContains(resp, reverse("publications:wos_upload"))
+
+
+class PublicationDetailAndAssetIntegrityTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="detail_tester", password="password123", role="viewer"
+        )
+        self.journal = Journal.objects.create(name="Physical Review Letters", impact_factor=9.1)
+        self.author = Author.objects.create(first_name="Subrahmanyan", last_name="Chandrasekhar", rri_role="Faculty")
+        self.dept = Department.objects.create(code="AST", name="Astrophysics")
+
+    def test_publication_detail_renders_real_metadata_and_yearly_citations(self):
+        pub = Publication.objects.create(
+            title="The Highly Collapsed Configurations of a Stellar Mass",
+            document_type="Journal Article",
+            date_published="1931-01-15",
+            collaboration_type="National",
+            journal=self.journal,
+            volume="91",
+            issue="4",
+            page_number="456-466",
+            article_number="MN-1931",
+            doi="10.1093/mnras/91.4.456",
+        )
+        pub.authors.add(self.author)
+        pub.departments.add(self.dept)
+
+        # Add yearly citations
+        Citation.objects.create(
+            publication=pub,
+            year=2022,
+            wos_citations=42,
+            gs_citations=65,
+            scopus_citations=40,
+        )
+        Citation.objects.create(
+            publication=pub,
+            year=2023,
+            wos_citations=58,
+            gs_citations=80,
+            scopus_citations=55,
+        )
+
+        resp = self.client.get(reverse("publications:publication_detail", kwargs={"pk": pub.pk}))
+        self.assertEqual(resp.status_code, 200)
+
+        # Accurate metadata rendering
+        self.assertContains(resp, "Vol. 91, Issue 4")
+        self.assertContains(resp, "pp. 456-466")
+        self.assertContains(resp, "Art. MN-1931")
+        self.assertContains(resp, "10.1093/mnras/91.4.456")
+        self.assertContains(resp, "Subrahmanyan Chandrasekhar")
+        self.assertContains(resp, "Astrophysics")
+
+        # Yearly citations table
+        self.assertContains(resp, "Yearly Citations")
+        self.assertContains(resp, "2 recorded years")
+        self.assertContains(resp, "2022")
+        self.assertContains(resp, "42")
+        self.assertContains(resp, "65")
+        self.assertContains(resp, "40")
+        self.assertContains(resp, "2023")
+        self.assertContains(resp, "58")
+        self.assertContains(resp, "80")
+        self.assertContains(resp, "55")
+
+        # Nonexistent fields should not be rendered
+        self.assertNotContains(resp, "Open Full Text")
+        self.assertNotContains(resp, "View Citation")
+        self.assertNotContains(resp, "<h2 class=\"card-title\">Abstract</h2>")
+
+    def test_publication_detail_handles_missing_citations_gracefully(self):
+        pub = Publication.objects.create(
+            title="Recent Preprint Without Citations",
+            document_type="Miscellaneous Article",
+            date_published="2024-01-01",
+            collaboration_type="National",
+            journal=self.journal,
+        )
+
+        resp = self.client.get(reverse("publications:publication_detail", kwargs={"pk": pub.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "No yearly citation records recorded for this publication.")
+
+    def test_publications_list_does_not_load_external_cdn_chartjs(self):
+        resp = self.client.get(reverse("publications:list"))
+        self.assertEqual(resp.status_code, 200)
+        # Verify external CDN script tag is removed
+        self.assertNotContains(resp, "https://cdn.jsdelivr.net/npm/chart.js")
+        # Verify local static Chart.js bundle is loaded via base template
+        self.assertContains(resp, "chart.min.js")
