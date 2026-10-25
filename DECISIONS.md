@@ -14,6 +14,7 @@ This document records the architectural, security, and engineering decisions mad
 | **[D-004](#d-004-separation-of-environment-helpers-into-envpy)** | Separation of Environment Helpers into Dedicated env.py Module | 2026-10-24 | **Accepted** |
 | **[D-005](#d-005-dashboard-authentication-and-role-based-access-control)** | Dashboard Authentication and Role-Based Access Control | 2026-10-24 | **Accepted** |
 | **[D-006](#d-006-publication-ownership-retention-password-reset-workflow-and-production-security-hardening)** | Publication Ownership Retention, Password Reset Workflow, and Production Security Hardening | 2026-10-24 | **Accepted** |
+| **[D-007](#d-007-web-of-science-upload-hardening-file-size-limits-and-session-safety)** | Web of Science Upload Hardening, File Size Limits, and Session Safety | 2026-10-25 | **Accepted** |
 
 ---
 
@@ -250,6 +251,46 @@ Following the implementation of dashboard authentication and RBAC (D-005), three
   - Production deployments can achieve zero warnings on `check --deploy` by setting standard environment variables.
 - **Negative / Trade-offs**:
   - Nullable `created_by` foreign key requires views and templates to handle unowned publications gracefully (already handled by existing code).
+
+---
+
+## D-007: Web of Science Upload Hardening, File Size Limits, and Session Safety
+
+- **Date**: 2026-10-25
+- **Status**: Accepted
+- **Context**:
+  Security audit finding SEC-05 ([`07-authentication-authorization-and-security.md`](docs/project-audit/07-authentication-authorization-and-security.md)) identified unbounded file uploads and session table bloat in `/publications/wos/upload/`. `wos_upload` was reading uploaded files into memory without verifying `request.FILES["wos_file"].size`, accepting non-text files, and storing unlimited parsed publication dictionaries directly into `request.session["wos_records"]`. In an environment backed by SQLite, an adversarial or oversized file (e.g. 100+ MB) could exhaust server RAM or bloat the `django_session` table, locking SQLite during serialization.
+
+- **Decision**:
+  1. **Enforce Global & Ingestion Upload Memory Limits in Settings**:
+     - Configure `FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880` (5 MB) and `DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880` (5 MB) in `rri_publications_dashboard/settings.py` via `env.py:get_int`.
+     - Define `MAX_WOS_FILE_SIZE = 5242880` (5 MB) and `MAX_WOS_RECORDS = 500` configurable via environment variables in `.env.example`.
+  2. **View-Level Pre-Read Validation (`publications/views.py:wos_upload`)**:
+     - Validate `uploaded_file.size <= MAX_WOS_FILE_SIZE` *before* reading the file into memory.
+     - Enforce file extension check strictly permitting `.txt` or `.tsv`.
+     - Validate `uploaded_file.content_type`, rejecting non-text, binary, executable, and archive MIME types.
+     - Validate batch record count `len(records) <= MAX_WOS_RECORDS` *before* staging records into `request.session`.
+     - Handle parsing and stream exceptions cleanly with user-facing flash messages, redirecting safely without HTTP 500 errors.
+  3. **Parser Hardening (`publications/utils/wos_parser.py`)**:
+     - Support UTF-8 and UTF-8 with Byte Order Mark (`utf-8-sig`) to seamlessly process Windows exports (`Tab-delimited (Win)`).
+     - Increase `csv.field_size_limit` to support large bibliographic fields (e.g., extensive author addresses or cited references).
+     - Strictly validate headers: require mandatory `TI` (Title) and at least one standard Web of Science field tag (`SO`, `AF`, `AU`, `PY`, `UT`, `PT`, `DT`, `DI`, etc.). Return an empty list for non-WoS or malformed files.
+     - Filter out empty rows, summary lines, or EOF tags (e.g., `EF`) missing valid titles.
+  4. **Template Message Visibility (`templates/publications/upload.html`)**:
+     - Render Django flash messages (`messages`) in `upload.html` so validation rejections, format errors, and size warnings are prominently displayed to uploading staff.
+
+- **Alternatives Considered**:
+  - **Asynchronous Task Queue (Celery / Redis / Postgres)**: Deferred. For the institution's yearly volume (~100–300 papers per year, reviewed in small batches), a 5 MB / 500-record synchronous limit eliminates memory exhaustion and session bloat without adding infrastructure complexity.
+  - **Temporary Database Staging Table**: Considered for record staging instead of `request.session`. However, capping batches at 500 records keeps session payloads under ~200 KB in SQLite, cleanly resolving the immediate vulnerability without redesigning the multi-step review workflow.
+
+- **Consequences**:
+  - **Positive**:
+     - Resolves audit finding SEC-05.
+     - Server memory and SQLite session table are fully protected against unbounded uploads and DoS.
+     - Windows UTF-8 BOM exports are parsed cleanly without corrupted headers.
+     - Non-WoS files, binaries, oversized payloads, and malformed inputs fail closed with clear user messages.
+  - **Trade-offs**:
+     - Large multi-year historical exports (> 500 records or > 5 MB) must be exported in annual or departmental batches.
 
 ---
 

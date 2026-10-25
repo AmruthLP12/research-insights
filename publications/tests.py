@@ -1,7 +1,8 @@
 import json
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from publications.models import (
@@ -667,3 +668,258 @@ class PublicPublicationPagesTestCase(TestCase):
         response = self.client.get(reverse("publications:publication_detail", kwargs={"pk": pub.pk}))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, pub.title)
+
+
+class WoSUploadSecurityAndLimitsTestCase(TestCase):
+    """
+    Test suite for Web of Science upload security, file size boundaries,
+    batch record limits, file type validation, encoding, and safe error handling.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="wos_uploader", password="password123", role="user"
+        )
+        self.client.force_login(self.user)
+
+    def _generate_wos_tsv(self, records: list[dict], extra_padding: int = 0) -> bytes:
+        headers = ["PT", "TI", "SO", "DT", "PY", "VL", "IS", "BP", "EP", "DI", "AF", "C1"]
+        lines = ["\t".join(headers)]
+        for r in records:
+            row = [
+                r.get("PT", "J"),
+                r.get("TI", "Title"),
+                r.get("SO", "Journal"),
+                r.get("DT", "Article"),
+                r.get("PY", "2023"),
+                r.get("VL", "1"),
+                r.get("IS", "1"),
+                r.get("BP", "10"),
+                r.get("EP", "20"),
+                r.get("DI", "10.1000/123"),
+                r.get("AF", "Raman, C"),
+                r.get("C1", "[Raman, C] Raman Research Institute, Bangalore, India"),
+            ]
+            lines.append("\t".join(row))
+
+        base_content = "\n".join(lines) + "\n"
+        if extra_padding > 0:
+            base_content += "# " + ("x" * (extra_padding - 3)) + "\n"
+        return base_content.encode("utf-8")
+
+    def test_upload_file_size_boundary_below_limit(self):
+        """Files immediately below the 5 MB limit (5 MB - 100 bytes) are accepted."""
+        target_size = 5 * 1024 * 1024 - 100
+        headers = "PT\tTI\tSO\tDT\tPY\tAF\tC1\n"
+        row_prefix = "J\tValid Paper Below Limit\tNature\tArticle\t2023\tAuthor, A\t[Author, A] RRI, Bangalore, India "
+        row_suffix = "\n"
+        current_len = len((headers + row_prefix + row_suffix).encode("utf-8"))
+        padding_needed = target_size - current_len
+        tsv_content = (headers + row_prefix + ("x" * padding_needed) + row_suffix).encode("utf-8")
+        self.assertEqual(len(tsv_content), target_size)
+
+        uploaded_file = SimpleUploadedFile("wos_below.txt", tsv_content, content_type="text/plain")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": uploaded_file},
+        )
+        self.assertRedirects(response, reverse("publications:wos_review"))
+        self.assertIn("wos_records", self.client.session)
+        self.assertEqual(len(self.client.session["wos_records"]), 1)
+
+    def test_upload_file_size_boundary_at_limit(self):
+        """Files exactly at the 5 MB limit (5 MB) are accepted."""
+        target_size = 5 * 1024 * 1024
+        headers = "PT\tTI\tSO\tDT\tPY\tAF\tC1\n"
+        row_prefix = "J\tValid Paper At Limit\tNature\tArticle\t2023\tAuthor, A\t[Author, A] RRI, Bangalore, India "
+        row_suffix = "\n"
+        current_len = len((headers + row_prefix + row_suffix).encode("utf-8"))
+        padding_needed = target_size - current_len
+        tsv_content = (headers + row_prefix + ("x" * padding_needed) + row_suffix).encode("utf-8")
+        self.assertEqual(len(tsv_content), target_size)
+
+        uploaded_file = SimpleUploadedFile("wos_at_limit.txt", tsv_content, content_type="text/plain")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": uploaded_file},
+        )
+        self.assertRedirects(response, reverse("publications:wos_review"))
+        self.assertIn("wos_records", self.client.session)
+        self.assertEqual(len(self.client.session["wos_records"]), 1)
+
+    def test_upload_file_size_boundary_above_limit_rejected(self):
+        """Files immediately above the 5 MB limit (5 MB + 1 byte) are rejected before parsing."""
+        target_size = 5 * 1024 * 1024 + 1
+        headers = "PT\tTI\tSO\tDT\tPY\tAF\tC1\n"
+        row_prefix = "J\tOversized Paper\tNature\tArticle\t2023\tAuthor, A\t[Author, A] RRI, Bangalore, India "
+        row_suffix = "\n"
+        current_len = len((headers + row_prefix + row_suffix).encode("utf-8"))
+        padding_needed = target_size - current_len
+        tsv_content = (headers + row_prefix + ("x" * padding_needed) + row_suffix).encode("utf-8")
+        self.assertEqual(len(tsv_content), target_size)
+
+        uploaded_file = SimpleUploadedFile("wos_oversized.txt", tsv_content, content_type="text/plain")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": uploaded_file},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("publications:wos_upload"))
+        self.assertNotIn("wos_records", self.client.session)
+        self.assertContains(response, "exceeds the maximum allowed size of 5 MB")
+
+    @override_settings(MAX_WOS_FILE_SIZE=1024)
+    def test_upload_file_size_custom_setting_boundary(self):
+        """Custom MAX_WOS_FILE_SIZE setting enforces boundary correctly."""
+        headers = "PT\tTI\tSO\tDT\tPY\tAF\tC1\n"
+        row_prefix = "J\tBoundary\tNature\tArticle\t2023\tA\t[A] RRI "
+        row_suffix = "\n"
+        current_len = len((headers + row_prefix + row_suffix).encode("utf-8"))
+
+        # Exactly 1024 bytes -> accepted
+        content_1024 = (headers + row_prefix + ("x" * (1024 - current_len)) + row_suffix).encode("utf-8")
+        self.assertEqual(len(content_1024), 1024)
+        file_1024 = SimpleUploadedFile("exact_1024.txt", content_1024, content_type="text/plain")
+        resp = self.client.post(reverse("publications:wos_upload"), {"wos_file": file_1024})
+        self.assertRedirects(resp, reverse("publications:wos_review"))
+
+        # Clean session
+        session = self.client.session
+        session.pop("wos_records", None)
+        session.pop("wos_index", None)
+        session.save()
+
+        # 1025 bytes -> rejected
+        content_1025 = (headers + row_prefix + ("x" * (1025 - current_len)) + row_suffix).encode("utf-8")
+        self.assertEqual(len(content_1025), 1025)
+        file_1025 = SimpleUploadedFile("exceed_1025.txt", content_1025, content_type="text/plain")
+        resp = self.client.post(reverse("publications:wos_upload"), {"wos_file": file_1025}, follow=True)
+        self.assertRedirects(resp, reverse("publications:wos_upload"))
+        self.assertNotIn("wos_records", self.client.session)
+        self.assertContains(resp, "exceeds the maximum allowed size")
+
+    def test_upload_invalid_file_extension_rejected(self):
+        """Disallowed extensions (.pdf, .csv, .exe, .bin) are rejected before parsing."""
+        tsv_bytes = b"PT\tTI\tSO\nJ\tTest\tJournal\n"
+        for bad_filename in ["records.pdf", "records.csv", "records.exe", "records.bin"]:
+            with self.subTest(filename=bad_filename):
+                file_obj = SimpleUploadedFile(bad_filename, tsv_bytes, content_type="text/plain")
+                response = self.client.post(
+                    reverse("publications:wos_upload"),
+                    {"wos_file": file_obj},
+                    follow=True,
+                )
+                self.assertRedirects(response, reverse("publications:wos_upload"))
+                self.assertNotIn("wos_records", self.client.session)
+                self.assertContains(response, "Invalid file format")
+
+    def test_upload_valid_tsv_extension_accepted(self):
+        """Files with .tsv extension are accepted."""
+        tsv_content = b"PT\tTI\tSO\tDT\tPY\tAF\nJ\tTSV Paper\tScience\tArticle\t2023\tAuthor, T\n"
+        file_obj = SimpleUploadedFile("records.tsv", tsv_content, content_type="text/tab-separated-values")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": file_obj},
+        )
+        self.assertRedirects(response, reverse("publications:wos_review"))
+        self.assertIn("wos_records", self.client.session)
+        self.assertEqual(self.client.session["wos_records"][0]["publication"]["title"], "TSV Paper")
+
+    def test_upload_disallowed_mime_type_rejected(self):
+        """Files with dangerous or non-text MIME types are rejected before parsing."""
+        tsv_bytes = b"PT\tTI\tSO\nJ\tTest\tJournal\n"
+        for bad_mime in ["application/pdf", "image/png", "application/zip", "application/x-sh"]:
+            with self.subTest(mime=bad_mime):
+                file_obj = SimpleUploadedFile("records.txt", tsv_bytes, content_type=bad_mime)
+                response = self.client.post(
+                    reverse("publications:wos_upload"),
+                    {"wos_file": file_obj},
+                    follow=True,
+                )
+                self.assertRedirects(response, reverse("publications:wos_upload"))
+                self.assertNotIn("wos_records", self.client.session)
+                self.assertContains(response, "Invalid file type")
+
+    def test_upload_utf8_with_bom_parsed_successfully(self):
+        """Windows UTF-8 export with Byte Order Mark (\\ufeff) is parsed cleanly."""
+        bom_content = "\ufeffPT\tTI\tSO\tDT\tPY\tAF\nJ\tPaper with BOM\tNature Physics\tArticle\t2023\tBOM, Author\n".encode("utf-8")
+        file_obj = SimpleUploadedFile("wos_bom.txt", bom_content, content_type="text/plain")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": file_obj},
+        )
+        self.assertRedirects(response, reverse("publications:wos_review"))
+        self.assertIn("wos_records", self.client.session)
+        record = self.client.session["wos_records"][0]
+        self.assertEqual(record["publication"]["title"], "Paper with BOM")
+        self.assertEqual(record["publication"]["journal_name"], "Nature Physics")
+
+    def test_upload_non_wos_tsv_rejected(self):
+        """Arbitrary TSV files lacking standard Web of Science headers are rejected."""
+        arbitrary_tsv = b"Name\tEmail\tDepartment\nAlice\talice@example.com\tPhysics\n"
+        file_obj = SimpleUploadedFile("users.tsv", arbitrary_tsv, content_type="text/tab-separated-values")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": file_obj},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("publications:wos_upload"))
+        self.assertNotIn("wos_records", self.client.session)
+        self.assertContains(response, "no publication records were detected")
+
+    def test_upload_batch_record_limit_exceeded_rejected(self):
+        """Files exceeding the maximum batch record limit (500 records) are rejected."""
+        records = [
+            {"TI": f"Batch Paper #{i}", "SO": "Test Journal", "AF": f"Author, {i}"}
+            for i in range(501)
+        ]
+        tsv_content = self._generate_wos_tsv(records)
+        file_obj = SimpleUploadedFile("large_batch.txt", tsv_content, content_type="text/plain")
+        response = self.client.post(
+            reverse("publications:wos_upload"),
+            {"wos_file": file_obj},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("publications:wos_upload"))
+        self.assertNotIn("wos_records", self.client.session)
+        self.assertContains(response, "exceeds the maximum limit of 500 records per batch")
+
+    @override_settings(MAX_WOS_RECORDS=5)
+    def test_upload_custom_batch_record_limit_override(self):
+        """Custom MAX_WOS_RECORDS limit is enforced before session staging."""
+        # 5 records -> accepted
+        records_5 = [{"TI": f"Paper #{i}", "SO": "Journal", "AF": "Author, A"} for i in range(5)]
+        tsv_5 = self._generate_wos_tsv(records_5)
+        file_5 = SimpleUploadedFile("batch_5.txt", tsv_5, content_type="text/plain")
+        resp_5 = self.client.post(reverse("publications:wos_upload"), {"wos_file": file_5})
+        self.assertRedirects(resp_5, reverse("publications:wos_review"))
+        self.assertEqual(len(self.client.session["wos_records"]), 5)
+
+        # Clean session
+        session = self.client.session
+        session.pop("wos_records", None)
+        session.pop("wos_index", None)
+        session.save()
+
+        # 6 records -> rejected
+        records_6 = [{"TI": f"Paper #{i}", "SO": "Journal", "AF": "Author, A"} for i in range(6)]
+        tsv_6 = self._generate_wos_tsv(records_6)
+        file_6 = SimpleUploadedFile("batch_6.txt", tsv_6, content_type="text/plain")
+        resp_6 = self.client.post(reverse("publications:wos_upload"), {"wos_file": file_6}, follow=True)
+        self.assertRedirects(resp_6, reverse("publications:wos_upload"))
+        self.assertNotIn("wos_records", self.client.session)
+        self.assertContains(resp_6, "exceeds the maximum limit of 5 records per batch")
+
+    def test_upload_parser_exception_handled_safely(self):
+        """Exceptions in the parser are caught cleanly and do not crash the view with a 500."""
+        valid_tsv = b"PT\tTI\tSO\nJ\tPaper\tJournal\n"
+        file_obj = SimpleUploadedFile("valid.txt", valid_tsv, content_type="text/plain")
+        with patch("publications.views.parse_wos_file", side_effect=ValueError("Corrupt stream error")):
+            response = self.client.post(
+                reverse("publications:wos_upload"),
+                {"wos_file": file_obj},
+                follow=True,
+            )
+            self.assertRedirects(response, reverse("publications:wos_upload"))
+            self.assertNotIn("wos_records", self.client.session)
+            self.assertContains(response, "Error processing Web of Science file")

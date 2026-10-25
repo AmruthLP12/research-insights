@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 
+from django.conf import settings
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -201,14 +202,66 @@ class PublicationDetailView(DetailView):
 # =====================================================
 @role_required("admin", "user")
 def wos_upload(request):
-    if request.method == "POST" and request.FILES.get("wos_file"):
-        records = parse_wos_file(request.FILES["wos_file"])
+    if request.method == "POST":
+        uploaded_file = request.FILES.get("wos_file")
+        if not uploaded_file:
+            messages.error(request, "Please select a Web of Science export file to upload.")
+            return render(request, "publications/upload.html")
+
+        # 1. Size check before reading into memory or parsing
+        max_file_size = getattr(settings, "MAX_WOS_FILE_SIZE", 5 * 1024 * 1024)
+        if uploaded_file.size > max_file_size:
+            max_mb = max_file_size // (1024 * 1024)
+            messages.error(
+                request,
+                f"The uploaded file exceeds the maximum allowed size of {max_mb} MB.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 2. File extension check (.txt or .tsv)
+        file_name = (uploaded_file.name or "").lower()
+        if not (file_name.endswith(".txt") or file_name.endswith(".tsv")):
+            messages.error(
+                request,
+                "Invalid file format. Please upload a tab-delimited text (.txt) or .tsv file exported from Web of Science.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 3. Content type check
+        content_type = (uploaded_file.content_type or "").lower()
+        disallowed_prefixes = (
+            "image/", "audio/", "video/", "application/pdf", "application/zip",
+            "application/x-", "application/msword", "application/vnd."
+        )
+        if any(content_type.startswith(p) for p in disallowed_prefixes):
+            messages.error(
+                request,
+                "Invalid file type. Only plain text or TSV files are allowed.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 4. Parse file safely
+        try:
+            records = parse_wos_file(uploaded_file)
+        except Exception as exc:
+            messages.error(request, f"Error processing Web of Science file: {exc}")
+            return redirect("publications:wos_upload")
 
         if not records:
             messages.error(
                 request,
                 "File was read successfully but no publication records were detected. "
                 "Please ensure the file is exported as FULL RECORD in tab-delimited format.",
+            )
+            return redirect("publications:wos_upload")
+
+        # 5. Batch record count limit check before staging in session
+        max_records = getattr(settings, "MAX_WOS_RECORDS", 500)
+        if len(records) > max_records:
+            messages.error(
+                request,
+                f"The uploaded file contains {len(records)} records, which exceeds the maximum limit of "
+                f"{max_records} records per batch. Please upload smaller batches.",
             )
             return redirect("publications:wos_upload")
 

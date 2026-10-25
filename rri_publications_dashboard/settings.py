@@ -37,6 +37,16 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = get_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", defa
 SECURE_HSTS_PRELOAD = get_bool("SECURE_HSTS_PRELOAD", default=False)
 SECURE_PROXY_SSL_HEADER = get_secure_proxy_ssl_header()
 
+# --- FILE UPLOADS & RESOURCE LIMITS ---
+# Maximum memory size (in bytes) before uploads stream to disk (default: 5 MB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = get_int("FILE_UPLOAD_MAX_MEMORY_SIZE", default=5 * 1024 * 1024)
+# Maximum size (in bytes) of request body data accepted before RequestDataTooBig (default: 5 MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = get_int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=5 * 1024 * 1024)
+# Maximum file size (in bytes) accepted for Web of Science exports (default: 5 MB)
+MAX_WOS_FILE_SIZE = get_int("MAX_WOS_FILE_SIZE", default=5 * 1024 * 1024)
+# Maximum publication records accepted per Web of Science upload batch (default: 500)
+MAX_WOS_RECORDS = get_int("MAX_WOS_RECORDS", default=500)
+
 # --- APPLICATION DEFINITION ---
 INSTALLED_APPS = [
     # Django core apps

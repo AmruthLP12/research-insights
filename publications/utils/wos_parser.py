@@ -1,34 +1,63 @@
+"""
+Web of Science (WoS) TSV export parser.
+
+Parses tab-delimited full-record exports from Web of Science into structured
+dictionaries for publication and author review.
+"""
+
 import csv
+import logging
 import re
+import sys
+
+logger = logging.getLogger(__name__)
+
+# Support large fields (such as comprehensive author affiliation lists and abstracts)
+try:
+    csv.field_size_limit(sys.maxsize)
+except OverflowError:
+    csv.field_size_limit(2147483647)
+
+# Core Web of Science two-letter field tags to validate standard export format
+WOS_CORE_TAGS = frozenset({
+    "SO", "AF", "AU", "DT", "PY", "DI", "UT", "PT", "C1", "VL", "IS", "BP", "EP", "AR", "ARTN"
+})
 
 
-def split_name(full_name):
+def split_name(full_name: str) -> tuple[str, str]:
+    """Split an author's name formatted as 'Last, First' into first and last name."""
+    if not full_name:
+        return "", ""
     parts = full_name.split(",")
     last = parts[0].strip()
     first = parts[1].strip() if len(parts) > 1 else ""
     return first, last
 
 
-def extract_country(address):
+def extract_country(address: str) -> str:
+    """Extract the country name from the trailing segment of an address string."""
     if not address:
         return ""
     parts = address.split(",")
     return parts[-1].strip()
 
 
-def parse_affiliation_blocks(c1_field):
+def parse_affiliation_blocks(c1_field: str | None) -> dict[str, list[dict]]:
     """
-    Parses:
-    [Author A; Author B] Affiliation text
+    Parses Web of Science C1 author affiliation blocks.
+
+    Format: [Author A; Author B] Affiliation text [Author C] Other affiliation
     Returns:
     {
-      "Author A": [ {aff}, {aff} ],
-      "Author B": [ {aff} ]
+      "Author A": [ {aff}, ... ],
+      "Author B": [ {aff}, ... ]
     }
     """
     mapping = {}
+    if not c1_field:
+        return mapping
 
-    blocks = re.findall(r"\[(.*?)\]\s*([^[]+)", c1_field or "")
+    blocks = re.findall(r"\[(.*?)\]\s*([^[]+)", c1_field)
 
     for authors_part, affiliation_text in blocks:
         authors = [a.strip() for a in authors_part.split(";")]
@@ -46,68 +75,131 @@ def parse_affiliation_blocks(c1_field):
     return mapping
 
 
-def parse_wos_file(file_obj):
-    decoded = file_obj.read().decode("utf-8", errors="ignore").splitlines()
-    reader = csv.DictReader(decoded, delimiter="\t")
+def parse_wos_file(file_obj) -> list[dict]:
+    """
+    Parse an uploaded Web of Science tab-delimited export file.
+
+    Handles UTF-8 and UTF-8 with BOM (utf-8-sig) encodings. Validates that the
+    file contains standard Web of Science headers (including mandatory 'TI').
+
+    Returns a list of publication record dictionaries, or an empty list if the
+    file is invalid, empty, or contains no valid publication rows.
+    """
+    try:
+        raw = file_obj.read()
+    except Exception as exc:
+        logger.warning("Failed to read uploaded file: %s", exc)
+        return []
+
+    if isinstance(raw, str):
+        text = raw
+    elif isinstance(raw, (bytes, bytearray)):
+        try:
+            # utf-8-sig automatically strips UTF-8 BOM (\xef\xbb\xbf)
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = raw.decode("utf-8", errors="replace")
+    else:
+        return []
+
+    lines = text.splitlines()
+    if not lines:
+        return []
+
+    try:
+        reader = csv.DictReader(lines, delimiter="\t")
+    except Exception as exc:
+        logger.warning("Failed to initialize TSV DictReader: %s", exc)
+        return []
+
+    raw_fieldnames = reader.fieldnames
+    if not raw_fieldnames:
+        return []
+
+    # Clean fieldnames (strip whitespace/BOM remnants)
+    fieldnames = {f.strip() for f in raw_fieldnames if f}
+
+    # Validate that mandatory Title field and at least one other standard WoS tag exist
+    if "TI" not in fieldnames or not (fieldnames & WOS_CORE_TAGS):
+        logger.info("Uploaded file lacks standard Web of Science headers ('TI' and core tags).")
+        return []
 
     records = []
 
-    for row in reader:
+    try:
+        for row in reader:
+            if not row:
+                continue
 
-        # -----------------------
-        # PAGE NUMBER OR ARTICLE NUMBER
-        # -----------------------
-        page_number = ""
+            raw_title = row.get("TI")
+            if not raw_title or not str(raw_title).strip():
+                # Skip empty lines, summary rows, or EOF tags (e.g., 'EF')
+                continue
 
-        if row.get("BP") and row.get("EP"):
-            page_number = f"{row.get('BP')}-{row.get('EP')}"
-        elif row.get("AR"):
-            page_number = row.get("AR")
-        elif row.get("ARTN"):
-            page_number = row.get("ARTN")
+            title = str(raw_title).strip()
 
-        # -----------------------
-        # Publication
-        # -----------------------
-        article_number = row.get("AR") or row.get("ARTN") or ""
+            # -----------------------
+            # PAGE NUMBER OR ARTICLE NUMBER
+            # -----------------------
+            page_number = ""
+            bp = (row.get("BP") or "").strip()
+            ep = (row.get("EP") or "").strip()
+            ar = (row.get("AR") or "").strip()
+            artn = (row.get("ARTN") or "").strip()
 
-        publication = {
-            "title": row.get("TI"),
-            "journal_name": row.get("SO"),
-            "document_type": row.get("DT"),
-            "date_published": f"{row.get('PY')}-01-01" if row.get("PY") else None,
-            "volume": row.get("VL"),
-            "issue": row.get("IS"),
-            "page_number": page_number,
-            "article_number": article_number,
-            "doi": row.get("DI"),
-        }
+            if bp and ep:
+                page_number = f"{bp}-{ep}"
+            elif ar:
+                page_number = ar
+            elif artn:
+                page_number = artn
 
-        # -----------------------
-        # Authors
-        # -----------------------
-        author_names = [
-            a.strip()
-            for a in (row.get("AF") or "").split(";")
-            if a.strip()
-        ]
+            article_number = ar or artn
 
-        affiliation_map = parse_affiliation_blocks(row.get("C1"))
+            # -----------------------
+            # Publication
+            # -----------------------
+            py = (row.get("PY") or "").strip()
+            date_published = f"{py}-01-01" if py else None
 
-        authors = []
+            publication = {
+                "title": title,
+                "journal_name": (row.get("SO") or "").strip() or row.get("SO"),
+                "document_type": (row.get("DT") or "").strip() or row.get("DT"),
+                "date_published": date_published,
+                "volume": (row.get("VL") or "").strip() or row.get("VL"),
+                "issue": (row.get("IS") or "").strip() or row.get("IS"),
+                "page_number": page_number,
+                "article_number": article_number,
+                "doi": (row.get("DI") or "").strip() or row.get("DI"),
+            }
 
-        for full_name in author_names:
-            first, last = split_name(full_name)
+            # -----------------------
+            # Authors
+            # -----------------------
+            af_raw = row.get("AF") or row.get("AU") or ""
+            author_names = [
+                a.strip()
+                for a in af_raw.split(";")
+                if a.strip()
+            ]
 
-            authors.append({
-                "first_name": first,
-                "last_name": last,
-                "affiliations_json": affiliation_map.get(full_name, []),
+            affiliation_map = parse_affiliation_blocks(row.get("C1"))
+
+            authors = []
+            for full_name in author_names:
+                first, last = split_name(full_name)
+                authors.append({
+                    "first_name": first,
+                    "last_name": last,
+                    "affiliations_json": affiliation_map.get(full_name, []),
+                })
+
+            records.append({
+                "publication": publication,
+                "authors": authors,
             })
-
-        records.append({
-            "publication": publication,
-            "authors": authors,
-        })
+    except csv.Error as exc:
+        logger.warning("Encountered CSV parsing error while reading rows: %s", exc)
 
     return records

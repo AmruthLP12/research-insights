@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Ingestion Security & Validation - 2026-10-25
+
+#### Step 8: Harden Web of Science Upload Validation and Resource Limits
+- **Upload Security & Resource Constraints**:
+  - Configured `FILE_UPLOAD_MAX_MEMORY_SIZE = 5242880` (5 MB) and `DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880` (5 MB) in `rri_publications_dashboard/settings.py` using `env.py:get_int`.
+  - Added configurable environment variable defaults for `MAX_WOS_FILE_SIZE` (5 MB) and `MAX_WOS_RECORDS` (500) documented in `.env.example`.
+  - Enforced file size checks in `publications/views.py:wos_upload` *before* reading payloads into memory or invoking the parser.
+  - Enforced strict extension checks rejecting non-text formats and admitting only `.txt` and `.tsv`.
+  - Added MIME type rejection for binary, executable, and archive content types.
+  - Enforced batch record limits (`MAX_WOS_RECORDS = 500`) *before* staging records into `request.session`, preventing database session bloat and SQLite lock contention.
+  - Handled parser and stream exceptions safely with informative user messages rather than unhandled HTTP 500 errors.
+- **Web of Science Parser Hardening (`publications/utils/wos_parser.py`)**:
+  - Added `utf-8-sig` encoding support to handle Windows exports with Byte Order Marks (`\ufeff`) without header corruption.
+  - Configured `csv.field_size_limit` to support extensive author affiliation and cited reference fields.
+  - Implemented header validation: requires mandatory `TI` (Title) tag and intersection with core WoS tags (`SO`, `AF`, `AU`, `DT`, `PY`, `DI`, `UT`, `PT`, etc.); rejects arbitrary non-WoS TSV inputs.
+  - Cleaned row parsing: skips empty rows, summary lines, and trailing EOF markers (`EF`) lacking valid publication titles.
+- **Template Message Visibility (`templates/publications/upload.html`)**:
+  - Added display block for Django flash messages (`messages`), ensuring validation errors, format rejections, and size limit alerts are clearly visible to users.
+- **Regression Test Coverage (`publications/tests.py`)**:
+  - Added `WoSUploadSecurityAndLimitsTestCase` with 12 new tests (expanding `publications` tests from 28 to 40, total test suite to 79):
+    - `test_upload_file_size_boundary_below_limit`: Verifies file of 5 MB - 100 bytes is accepted and parsed.
+    - `test_upload_file_size_boundary_at_limit`: Verifies file of exactly 5 MB is accepted.
+    - `test_upload_file_size_boundary_above_limit_rejected`: Verifies file of 5 MB + 1 byte is rejected before reading, with 0 session records.
+    - `test_upload_file_size_custom_setting_boundary`: Verifies custom `MAX_WOS_FILE_SIZE` setting at exact byte boundaries.
+    - `test_upload_invalid_file_extension_rejected`: Verifies rejection of `.pdf`, `.csv`, `.exe`, and `.bin` formats.
+    - `test_upload_valid_tsv_extension_accepted`: Verifies `.tsv` format acceptance.
+    - `test_upload_disallowed_mime_type_rejected`: Verifies rejection of non-text MIME types.
+    - `test_upload_utf8_with_bom_parsed_successfully`: Verifies Windows UTF-8 BOM parsing.
+    - `test_upload_non_wos_tsv_rejected`: Verifies rejection of arbitrary TSV files lacking WoS headers.
+    - `test_upload_batch_record_limit_exceeded_rejected`: Verifies rejection of files with > 500 records before session staging.
+    - `test_upload_custom_batch_record_limit_override`: Verifies custom `MAX_WOS_RECORDS` setting boundary.
+    - `test_upload_parser_exception_handled_safely`: Verifies parser exceptions redirect safely with user message and no 500.
+- **Verification Results**:
+  - Entire test suite (79 tests across `accounts`, `dashboard`, `publications`) passes with 0 failures and 0 errors.
+  - `python manage.py check` reports 0 issues.
+  - `python manage.py makemigrations --check --dry-run` reports no schema drift.
+  - `git diff --check` reports no whitespace errors.
+- **Files Modified**:
+  - `rri_publications_dashboard/settings.py`
+  - `.env.example`
+  - `publications/views.py`
+  - `publications/utils/wos_parser.py`
+  - `templates/publications/upload.html`
+  - `publications/tests.py`
+  - `DECISIONS.md`
+  - `CHANGELOG.md`
+
 ### Security & Authorization - 2026-10-25
 
 #### Step 7: Audit and Enforce Dashboard Endpoint Permissions
