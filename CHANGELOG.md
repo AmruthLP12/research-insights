@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security & Authorization - 2026-10-25
+
+#### Step 7: Audit and Enforce Dashboard Endpoint Permissions
+- **Dashboard Authorization Audit & Systematic Verification**:
+  - Audited all 21 class-based views in `dashboard/views.py` against the access control policy established in D-005.
+  - Confirmed all 21 views inherit from `LoginRequiredMixin` and `TemplateView`, establishing server-side authentication enforcement on all analytical endpoints.
+  - Confirmed that dashboard views are read-only analytics interfaces accessible by all authenticated roles (`viewer`, `user`, `admin`, `staff`, `superuser`).
+  - Confirmed that mutation attempts (POST, PUT, DELETE, PATCH) on read-only dashboard endpoints fail closed with HTTP 405 Method Not Allowed.
+  - Confirmed that anonymous requests across all 21 endpoints redirect to `accounts:login` preserving the `?next=<url>` query parameter for post-login return.
+  - Confirmed that public routes (`/publications/` catalog list, `/publications/<pk>/` detail) remain accessible to anonymous traffic without restriction.
+  - Confirmed invalid object identifiers on detail endpoints (`journal_detail`, `department_detail`, `impact_detail`) return HTTP 404 Not Found.
+- **Regression Test Coverage (`dashboard/tests.py`)**:
+  - Expanded `dashboard/tests.py` from 4 to 14 tests:
+    - `test_total_view_count`: Verifies all 21 dashboard endpoints are mapped and tracked.
+    - `test_anonymous_get_redirects_to_login_with_next_param`: Verifies 302 redirect with preserved `?next=` query parameter across all 21 endpoints.
+    - `test_anonymous_post_redirects_to_login`: Verifies anonymous POST attempts redirect to login.
+    - `test_anonymous_unsupported_methods_redirect_to_login`: Verifies anonymous PUT and DELETE attempts redirect to login.
+    - `test_authenticated_viewer_role_access`: Verifies HTTP 200 OK across all 21 endpoints for `viewer` role.
+    - `test_authenticated_user_role_access`: Verifies HTTP 200 OK across all 21 endpoints for `user` role.
+    - `test_authenticated_admin_role_access`: Verifies HTTP 200 OK across all 21 endpoints for `admin` role.
+    - `test_staff_and_superuser_access`: Verifies HTTP 200 OK across all 21 endpoints for staff and superusers.
+    - `test_authenticated_post_rejected_with_405_method_not_allowed`: Verifies HTTP 405 Method Not Allowed on POST across all 21 endpoints.
+    - `test_authenticated_unsupported_methods_rejected_with_405`: Verifies HTTP 405 Method Not Allowed on PUT and DELETE across all 21 endpoints.
+    - `test_root_redirect_behavior`: Verifies root URL `/` redirects to `/dashboard/` and follows to login for anonymous visitors or to home for authenticated users.
+    - `test_public_routes_remain_accessible_without_authentication`: Verifies publication list and detail views remain public.
+    - `test_detail_views_return_404_on_invalid_identifiers`: Verifies HTTP 404 on invalid journal/department IDs.
+    - `test_dashboard_handles_publications_with_null_creator`: Verifies aggregation views handle unowned publications.
+- **Verification Results**:
+  - Test suite ran **67 tests** across `accounts` (25 tests), `publications` (28 tests), and `dashboard` (14 tests) with 0 failures and 0 errors.
+  - `manage.py check` identified 0 issues.
+  - `makemigrations --check --dry-run` detected 0 schema drift.
+- **Files Modified**:
+  - `dashboard/tests.py`
+  - `CHANGELOG.md`
+
 ### Testing & Quality Assurance - 2026-10-24
 
 #### Task 7: Comprehensive Publication Workflow Testing and Security Regression Coverage
