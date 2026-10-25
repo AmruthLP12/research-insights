@@ -1,99 +1,87 @@
 {% load static tailwind_tags %}
 <!doctype html>
 <html lang="en" data-theme="light">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>{% block title %}RRI Publications Dashboard{% endblock %}</title>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    {% tailwind_css %}
+  <title>{% block title %}RRI Publications Dashboard{% endblock %}</title>
 
-    <script src="{% static 'js/chart.min.js' %}"></script>
-    <script src="{% static 'js/chart-theme.js' %}"></script>
-    <script src="{% static 'js/alpine.min.js' %}" defer></script>
-    <script src="{% static 'js/lucide.min.js' %}"></script>
-    {% block extra_head %}{% endblock %}
-  </head>
+  {% tailwind_css %}
 
-  <body
-    class="{% block body_class %}bg-base-200 min-h-screen{% endblock %}"
-    {% block body_attrs %}x-data="sidebarSetup()" x-init="init()"{% endblock %}
-  >
-    {% block body %}
-      {% block sidebar %} {% include "dashboard/sidebar.html" %} {% endblock %}
+  <script src="{% static 'js/chart.min.js' %}"></script>
+  <script src="{% static 'js/chart-theme.js' %}"></script>
+  <script src="{% static 'js/alpine.min.js' %}" defer></script>
+  <script src="{% static 'js/lucide.min.js' %}"></script>
+  {% block extra_head %}{% endblock %}
+</head>
 
-      <!-- Main Content Wrapper: shifts right to make room for the FIXED sidebar -->
-      <div
-        class="flex flex-col min-h-screen transition-all duration-300"
-        :class="isCollapsed ? 'lg:ml-[76px]' : 'lg:ml-72'"
-      >
-        <header
-          class="navbar bg-base-100/80 backdrop-blur border-b border-base-300 px-4 sm:px-6 py-3 sticky top-0 z-30"
-        >
-          <div class="flex-1 flex items-center gap-3 min-w-0">
-            <!-- Animated Hamburger -->
-            <button
-              @click="isSidebarOpen = !isSidebarOpen"
-              class="lg:hidden relative w-9 h-9 flex items-center justify-center btn btn-ghost btn-circle shrink-0"
-              aria-label="Toggle sidebar"
-            >
-              <div class="w-5 h-4 relative flex flex-col justify-between">
-                <span
-                  class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
-                  :class="isSidebarOpen && 'rotate-45 translate-y-[7px]'"
-                ></span>
-                <span
-                  class="block h-0.5 w-full bg-current rounded-full transition-all duration-300"
-                  :class="isSidebarOpen && 'opacity-0'"
-                ></span>
-                <span
-                  class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
-                  :class="isSidebarOpen && '-rotate-45 -translate-y-[7px]'"
-                ></span>
-              </div>
-            </button>
+<body class="{% block body_class %}bg-base-200 min-h-screen{% endblock %}" {% block body_attrs %}x-data="sidebarSetup()"
+  x-init="init()" {% endblock %}>
+  {% block body %}
+  {% block sidebar %} {% include "dashboard/sidebar.html" %} {% endblock %}
 
-            <h1 class="text-lg sm:text-xl font-semibold truncate">
-              {% block page_title %}Dashboard{% endblock %}
-            </h1>
+  <!-- Main Content Wrapper: shifts right to make room for the FIXED sidebar -->
+  <div class="flex flex-col min-h-screen transition-all duration-300" :class="isCollapsed ? 'lg:ml-19' : 'lg:ml-72'">
+    <header class="navbar bg-base-100/80 backdrop-blur border-b border-base-300 px-4 sm:px-6 py-3 sticky top-0 z-30">
+      <div class="flex-1 flex items-center gap-3 min-w-0">
+        <!-- Animated Hamburger -->
+        <button @click="isSidebarOpen = !isSidebarOpen"
+          class="lg:hidden relative w-9 h-9 flex items-center justify-center btn btn-ghost btn-circle shrink-0"
+          aria-label="Toggle sidebar">
+          <div class="w-5 h-4 relative flex flex-col justify-between">
+            <span class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
+              :class="isSidebarOpen && 'rotate-45 translate-y-1.75'"></span>
+            <span class="block h-0.5 w-full bg-current rounded-full transition-all duration-300"
+              :class="isSidebarOpen && 'opacity-0'"></span>
+            <span class="block h-0.5 w-full bg-current rounded-full transition-all duration-300 origin-center"
+              :class="isSidebarOpen && '-rotate-45 -translate-y-1.75'"></span>
           </div>
-        </header>
+        </button>
 
-        <main class="flex-1 overflow-y-auto p-4 sm:p-8">
-          {% if messages %}
-            <div class="space-y-2 mb-6">
-              {% for message in messages %}
-                <div class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
-                  <span>{{ message }}</span>
-                </div>
-              {% endfor %}
-            </div>
-          {% endif %}
-          {% block content %}{% endblock %}
-        </main>
+        <h1 class="text-lg sm:text-xl font-semibold truncate">
+          {% block page_title %}Dashboard{% endblock %}
+        </h1>
       </div>
+    </header>
 
-      <script>
-        function sidebarSetup() {
-          return {
-            isSidebarOpen: false,
-            isCollapsed: localStorage.getItem("sidebarCollapsed") === "true",
+    <main class="flex-1 overflow-y-auto p-4 sm:p-8">
+      {% if messages %}
+      <div class="space-y-2 mb-6">
+        {% for message in messages %}
+        <div
+          class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 
-            init() {
-              this.$watch("isCollapsed", (value) => {
-                localStorage.setItem("sidebarCollapsed", value);
-              });
-              this.$nextTick(() => {
-                if (window.lucide && typeof lucide.createIcons === "function") {
-                  lucide.createIcons();
-                }
-              });
-            },
-          };
-        }
-      </script>
-    {% endblock %}
-    {% block extra_scripts %}{% endblock %}
-  </body>
+  <script>
+    function sidebarSetup() {
+      return {
+        isSidebarOpen: false,
+        isCollapsed: localStorage.getItem("sidebarCollapsed") === "true",
+
+        init() {
+          this.$watch("isCollapsed", (value) => {
+            localStorage.setItem("sidebarCollapsed", value);
+          });
+          this.$nextTick(() => {
+            if (window.lucide && typeof lucide.createIcons === "function") {
+              lucide.createIcons();
+            }
+          });
+        },
+      };
+    }
+  </script>
+  {% endblock %}
+  {% block extra_scripts %}{% endblock %}
+</body>
+
 </html>
