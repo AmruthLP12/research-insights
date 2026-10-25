@@ -270,7 +270,17 @@ def wos_upload(request):
 
         return redirect("publications:wos_review")
 
-    return render(request, "publications/upload.html")
+    max_file_size = getattr(settings, "MAX_WOS_FILE_SIZE", 5 * 1024 * 1024)
+    max_records = getattr(settings, "MAX_WOS_RECORDS", 500)
+    return render(
+        request,
+        "publications/upload.html",
+        {
+            "max_file_size_mb": max_file_size // (1024 * 1024),
+            "max_file_size_bytes": max_file_size,
+            "max_records": max_records,
+        },
+    )
 
 
 # =====================================================
@@ -340,14 +350,21 @@ def wos_review(request):
         except Exception:
             form.affiliations_list = []
 
+    total_records = len(records)
+    current_index = index + 1
+    progress_percent = int((current_index / total_records) * 100) if total_records else 0
+
     return render(
         request,
         "publications/review.html",
         {
             "pub_form": pub_form,
             "author_formset": formset,
-            "index": index + 1,
-            "total": len(records),
+            "index": current_index,
+            "total": total_records,
+            "progress_percent": progress_percent,
+            "is_last_record": current_index >= total_records,
+            "remaining_count": max(0, total_records - current_index),
         },
     )
 
@@ -375,9 +392,18 @@ def wos_save(request):
     formset = AuthorFormSet(request.POST, queryset=Author.objects.none())
 
     if not pub_form.is_valid() or not formset.is_valid():
-        messages.error(request, "Please correct the errors below.")
-        print(pub_form.errors)
-        print(formset.errors)
+        error_items = []
+        for field, errors in pub_form.errors.items():
+            name = "Departments" if field == "departments" else field.replace("_", " ").capitalize()
+            error_items.append(f"{name}: {', '.join(errors)}")
+        for i, form in enumerate(formset.forms):
+            for field, errors in form.errors.items():
+                error_items.append(f"Author #{i+1} {field.replace('_', ' ').capitalize()}: {', '.join(errors)}")
+
+        if error_items:
+            messages.error(request, f"Please correct the errors: {'; '.join(error_items)}")
+        else:
+            messages.error(request, "Please correct the errors below.")
         return redirect("publications:wos_review")
 
     publication = pub_form.save(commit=False)
@@ -409,11 +435,30 @@ def wos_save(request):
     request.session["wos_index"] = index + 1
 
     if request.session["wos_index"] >= len(records):
+        saved_count = len(records)
         request.session.pop("wos_records", None)
         request.session.pop("wos_index", None)
+        request.session["wos_saved_count"] = saved_count
+        messages.success(
+            request,
+            f"Successfully imported and saved {saved_count} publication{'s' if saved_count != 1 else ''}.",
+        )
         return redirect("publications:wos_success")
 
     return redirect("publications:wos_review")
+
+
+# =====================================================
+# WOS CANCEL
+# =====================================================
+@role_required("admin", "user")
+def wos_cancel(request):
+    """Discard staged records and return to upload."""
+    records = request.session.pop("wos_records", None)
+    request.session.pop("wos_index", None)
+    if records:
+        messages.info(request, f"Import cancelled. {len(records)} staged record(s) discarded.")
+    return redirect("publications:wos_upload")
 
 
 # =====================================================
@@ -421,4 +466,5 @@ def wos_save(request):
 # =====================================================
 @role_required("admin", "user")
 def wos_success(request):
-    return render(request, "publications/wos_success.html")
+    saved_count = request.session.pop("wos_saved_count", None)
+    return render(request, "publications/wos_success.html", {"saved_count": saved_count})

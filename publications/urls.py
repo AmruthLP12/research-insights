@@ -12,5 +12,6 @@ urlpatterns = [
     path("wos/upload/", views.wos_upload, name="wos_upload"),
     path("wos/review/", views.wos_review, name="wos_review"),
     path("wos/save/", views.wos_save, name="wos_save"),
+    path("wos/cancel/", views.wos_cancel, name="wos_cancel"),
     path("wos/success/", views.wos_success, name="wos_success"),
 ]

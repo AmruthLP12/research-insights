@@ -1,67 +1,358 @@
 {% extends "base.html" %}
-{% block title %}Review Publication{% endblock %}
+{% block title %}Review Publication (Record {{ index }} of {{ total }}){% endblock %}
+{% block page_title %}Publication Review{% endblock %}
+
 {% block content %}
-    <div class="max-w-6xl mx-auto py-10">
-        <!-- ================= HEADER ================= -->
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-800">Review Publication</h1>
-            <p class="text-gray-600 mt-1">Record {{ index }} of {{ total }}</p>
-        </div>
-        <form method="post"
-              action="{% url 'publications:wos_save' %}"
-              class="space-y-10">
-            {% csrf_token %}
-            <!-- ================= PUBLICATION DETAILS ================= -->
-            <div class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-lg font-semibold mb-4 text-gray-700">Publication Details</h2>
-                <div class="space-y-4">{{ pub_form.as_p }}</div>
+<div class="max-w-5xl mx-auto py-6 sm:py-8 space-y-6">
+
+    <!-- ================= WORKFLOW HEADER & PROGRESS ================= -->
+    <div class="bg-white border border-base-300 rounded-2xl shadow-sm p-6 sm:p-7">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-gray-100">
+            <div>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                    Step 2 of 2: Record Review & Verification
+                </span>
+                <h1 class="text-2xl font-bold text-gray-900 tracking-tight mt-2">Review Publication Record</h1>
+                <p class="text-xs text-gray-500 mt-1">
+                    Carefully verify bibliographic metadata and author affiliations before committing each record to the catalog.
+                </p>
             </div>
-            <!-- ================= AUTHORS ================= -->
-            <div class="bg-white shadow rounded-lg p-6">
-                <h2 class="text-lg font-semibold mb-4 text-gray-700">Authors & Affiliations</h2>
-                {{ author_formset.management_form }}
+
+            <!-- Record Counter Pill -->
+            <div class="flex items-center sm:flex-col sm:items-end gap-2 shrink-0">
+                <span class="text-sm font-semibold text-gray-800 bg-gray-100 px-3.5 py-1.5 rounded-xl border border-gray-200">
+                    Record <strong class="text-blue-700 font-bold text-base">{{ index }}</strong> of <strong class="text-gray-900">{{ total }}</strong>
+                </span>
+                {% if is_last_record %}
+                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Final Record in Batch
+                    </span>
+                {% else %}
+                    <span class="text-[11px] text-gray-500 font-medium">
+                        {{ remaining_count }} remaining after this
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-4">
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1.5 font-medium">
+                <span>Batch Ingestion Progress</span>
+                <span>{{ progress_percent }}% Completed</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden border border-gray-200">
+                <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                     style="width: {{ progress_percent }}%;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= DJANGO FLASH MESSAGES ================= -->
+    {% if messages %}
+        <div class="space-y-3" role="status" aria-live="polite">
+            {% for message in messages %}
+                <div class="flex items-start gap-3 p-4 rounded-xl text-sm border shadow-sm {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-900{% elif message.tags == 'success' %}bg-green-50 border-green-200 text-green-900{% else %}bg-blue-50 border-blue-200 text-blue-900{% endif %}">
+                    <div class="shrink-0 mt-0.5">
+                        {% if message.tags == 'error' %}
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        {% else %}
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 leading-relaxed">
+                        {{ message }}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- ================= MAIN EDIT & PERSIST FORM ================= -->
+    <form method="post"
+          action="{% url 'publications:wos_save' %}"
+          x-data="{ isSaving: false }"
+          @submit="if(isSaving){ $event.preventDefault(); } else { isSaving = true; }"
+          class="space-y-6">
+        {% csrf_token %}
+
+        <!-- ================= CARD 1: PUBLICATION METADATA ================= -->
+        <div class="bg-white border border-base-300 rounded-2xl shadow-sm p-6 sm:p-7 space-y-6">
+            <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-900">Publication Metadata</h2>
+                    <p class="text-xs text-gray-500">Extracted from Web of Science tags (TI, SO, DT, PY, VL, IS, DI).</p>
+                </div>
+                <span class="text-xs text-gray-400 font-medium">Required fields marked with <span class="text-red-500">*</span></span>
+            </div>
+
+            <!-- Title (Full Width) -->
+            <div>
+                <label for="{{ pub_form.title.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                    Publication Title <span class="text-red-500">*</span>
+                </label>
+                {{ pub_form.title }}
+                {% if pub_form.title.errors %}
+                    <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.title.errors|first }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Two Columns: Journal & Document Type -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label for="{{ pub_form.journal.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Journal / Source Name
+                    </label>
+                    {{ pub_form.journal }}
+                    {% if pub_form.journal.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.journal.errors|first }}</p>
+                    {% endif %}
+                    <p class="text-[11px] text-gray-400 mt-1">Automatically mapped or created from source tag (SO).</p>
+                </div>
+
+                <div>
+                    <label for="{{ pub_form.document_type.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Document Type <span class="text-red-500">*</span>
+                    </label>
+                    {{ pub_form.document_type }}
+                    {% if pub_form.document_type.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.document_type.errors|first }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Three Columns: Date Published, Collaboration Type, DOI -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                    <label for="{{ pub_form.date_published.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Date Published <span class="text-red-500">*</span>
+                    </label>
+                    {{ pub_form.date_published }}
+                    {% if pub_form.date_published.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.date_published.errors|first }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ pub_form.collaboration_type.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Collaboration Scope <span class="text-red-500">*</span>
+                    </label>
+                    {{ pub_form.collaboration_type }}
+                    {% if pub_form.collaboration_type.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.collaboration_type.errors|first }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ pub_form.doi.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Digital Object Identifier (DOI)
+                    </label>
+                    {{ pub_form.doi }}
+                    {% if pub_form.doi.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.doi.errors|first }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Four Columns: Volume, Issue, Page Number, Article Number -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <label for="{{ pub_form.volume.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Volume
+                    </label>
+                    {{ pub_form.volume }}
+                    {% if pub_form.volume.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.volume.errors|first }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ pub_form.issue.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Issue
+                    </label>
+                    {{ pub_form.issue }}
+                    {% if pub_form.issue.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.issue.errors|first }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ pub_form.page_number.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Page Range
+                    </label>
+                    {{ pub_form.page_number }}
+                    {% if pub_form.page_number.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.page_number.errors|first }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="{{ pub_form.article_number.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                        Article Number
+                    </label>
+                    {{ pub_form.article_number }}
+                    {% if pub_form.article_number.errors %}
+                        <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.article_number.errors|first }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Departments Multi-select -->
+            <div>
+                <label for="{{ pub_form.departments.id_for_label }}" class="block text-xs font-semibold uppercase tracking-wider text-gray-700 mb-1.5">
+                    Institutional Departments
+                </label>
+                {{ pub_form.departments }}
+                {% if pub_form.departments.errors %}
+                    <p class="text-xs text-red-600 mt-1 font-medium">{{ pub_form.departments.errors|first }}</p>
+                {% endif %}
+                <p class="text-[11px] text-gray-400 mt-1">Assign one or more departments to associate this publication with departmental analytics.</p>
+            </div>
+        </div>
+
+        <!-- ================= CARD 2: AUTHORS & AFFILIATIONS ================= -->
+        <div class="bg-white border border-base-300 rounded-2xl shadow-sm p-6 sm:p-7 space-y-6">
+            <div class="border-b border-gray-100 pb-3 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-900">Authors & Affiliations</h2>
+                    <p class="text-xs text-gray-500">
+                        {{ author_formset.forms|length }} author(s) detected. RRI roles determine internal institutional attribution.
+                    </p>
+                </div>
+                <span class="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-md font-medium border border-gray-200">
+                    {{ author_formset.forms|length }} Author(s)
+                </span>
+            </div>
+
+            {{ author_formset.management_form }}
+
+            <div class="space-y-4">
                 {% for form in author_formset %}
-                    <div class="border rounded-lg p-4 mb-6">
-                        <!-- Author fields -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="border border-gray-200 rounded-xl p-4 sm:p-5 bg-gray-50/50 hover:bg-white transition-all space-y-4">
+                        <div class="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                            <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-800">
+                                <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center text-[11px] font-bold">
+                                    {{ forloop.counter }}
+                                </span>
+                                Author #{{ forloop.counter }}
+                            </span>
+
+                            <!-- Remove author toggle -->
+                            {% if form.DELETE %}
+                                <label class="inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-red-800 cursor-pointer font-medium">
+                                    {{ form.DELETE }}
+                                    <span>Exclude this author</span>
+                                </label>
+                            {% endif %}
+                        </div>
+
+                        <!-- 3 Columns: First Name, Last Name, RRI Role -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 mb-1">First Name</label>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">First Name</label>
                                 {{ form.first_name }}
+                                {% if form.first_name.errors %}
+                                    <p class="text-xs text-red-600 mt-1">{{ form.first_name.errors|first }}</p>
+                                {% endif %}
                             </div>
+
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 mb-1">Last Name</label>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
                                 {{ form.last_name }}
+                                {% if form.last_name.errors %}
+                                    <p class="text-xs text-red-600 mt-1">{{ form.last_name.errors|first }}</p>
+                                {% endif %}
                             </div>
+
                             <div>
-                                <label class="block text-sm font-medium text-gray-600 mb-1">RRI Role</label>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">RRI Role</label>
                                 {{ form.rri_role }}
+                                {% if form.rri_role.errors %}
+                                    <p class="text-xs text-red-600 mt-1">{{ form.rri_role.errors|first }}</p>
+                                {% endif %}
                             </div>
                         </div>
-                        <!-- Affiliations -->
-                        <div class="mt-3">
-                            <p class="text-sm font-semibold text-gray-600 mb-2">Affiliations (Institution, Country)</p>
+
+                        <!-- Affiliations List Display -->
+                        <div class="bg-white rounded-lg p-3 border border-gray-200 text-xs">
+                            <span class="font-semibold text-gray-700 block mb-1.5">Parsed Affiliations:</span>
                             {% if form.affiliations_list %}
-                                <ul class="list-disc ml-5 text-sm text-gray-700 space-y-1">
+                                <ul class="space-y-1 list-disc ml-5 text-gray-600">
                                     {% for aff in form.affiliations_list %}
-                                        <li>{{ aff.name }}{% if aff.country %}, {{ aff.country }}{% endif %}</li>
+                                        <li>
+                                            <span class="font-medium text-gray-800">{{ aff.name }}</span>
+                                            {% if aff.country %}
+                                                <span class="text-gray-500">({{ aff.country }})</span>
+                                            {% endif %}
+                                        </li>
                                     {% endfor %}
                                 </ul>
                             {% else %}
-                                <p class="text-sm text-gray-500 italic">No affiliation found – you may add one manually after saving.</p>
+                                <p class="text-gray-400 italic">No specific affiliation address detected in export tag C1.</p>
                             {% endif %}
                         </div>
-                        <!-- Hidden affiliations JSON -->
+
+                        <!-- Hidden fields -->
+                        {{ form.id }}
                         {{ form.affiliations_json }}
                     </div>
+                {% empty %}
+                    <p class="text-xs text-gray-500 italic p-4 text-center">No author records associated with this publication.</p>
                 {% endfor %}
             </div>
-            <!-- ================= ACTION BUTTONS ================= -->
-            <div class="flex justify-between items-center">
+        </div>
+
+        <!-- ================= CARD 3: ACTION CONTROLS ================= -->
+        <div class="bg-white border border-base-300 rounded-2xl shadow-sm p-5 flex flex-col sm:flex-row items-center justify-between gap-4 sticky bottom-4 z-20">
+            <!-- Cancel Import -->
+            <a href="{% url 'publications:wos_cancel' %}"
+               onclick="return confirm('Cancel this import batch? Any unsaved records in this batch will be discarded.');"
+               class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-2 rounded-lg hover:bg-red-50 transition"
+               title="Discard current batch and return to upload">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <span>Discard Import Batch</span>
+            </a>
+
+            <!-- Save Action Button with Honest Loading Feedback -->
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <button type="submit"
-                        class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold">
-                    Save & Continue
+                        :disabled="isSaving"
+                        class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition shadow-sm">
+                    <!-- Normal State -->
+                    <span x-show="!isSaving">
+                        {% if is_last_record %}
+                            Save Final Publication & Finish Import ✓
+                        {% else %}
+                            Save & Next Record ({{ index|add:1 }} of {{ total }}) →
+                        {% endif %}
+                    </span>
+
+                    <!-- Loading State -->
+                    <span x-show="isSaving" style="display: none;" class="inline-flex items-center gap-2">
+                        <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>
+                            {% if is_last_record %}
+                                Saving Final Publication...
+                            {% else %}
+                                Saving Publication & Advancing...
+                            {% endif %}
+                        </span>
+                    </span>
                 </button>
             </div>
-        </form>
-    </div>
+        </div>
+    </form>
+</div>
 {% endblock %}

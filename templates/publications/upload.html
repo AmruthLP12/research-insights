@@ -1,78 +1,362 @@
 {% extends "base.html" %}
-{% block title %}Upload Web of Science File{% endblock %}
+{% block title %}Import Publications from Web of Science{% endblock %}
+{% block page_title %}Publication Ingestion{% endblock %}
+
 {% block content %}
-    <div class="max-w-4xl mx-auto py-10">
-        <!-- ================= HEADER ================= -->
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-800">Upload Web of Science File</h1>
-            <p class="text-gray-600 mt-2">
-                Upload a <strong>tab-delimited (.txt)</strong> file downloaded from
-                <span class="font-semibold">Web of Science</span>.
-            </p>
-        </div>
-        <!-- ================= UPLOAD CARD ================= -->
-        <div class="bg-white shadow rounded-lg p-6">
-            <form method="post" enctype="multipart/form-data" class="space-y-6">
-                {% csrf_token %}
-                <!-- File input -->
-                <div>
-                    <label for="wos_file" class="block text-sm font-medium text-gray-700 mb-2">Web of Science Export File</label>
-                    <input type="file"
-                           name="wos_file"
-                           id="wos_file"
-                           accept=".txt,.tsv"
-                           required
-                           class="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0A4DA3]">
-                    <p class="text-sm text-gray-500 mt-2">
-                        Accepted format: <code>.txt</code> or <code>.tsv</code> (Tab-delimited, max 5 MB, up to 500 records)
-                    </p>
-                </div>
-                <!-- Instructions -->
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-900">
-                    <p class="font-semibold mb-1">How to export from Web of Science:</p>
-                    <ol class="list-decimal ml-5 space-y-1">
-                        <li>Select records in Web of Science</li>
-                        <li>Click <strong>Export</strong></li>
-                        <li>Choose <strong>Tab-delimited (Win)</strong></li>
-                        <li>Select <strong>Full Record</strong></li>
-                        <li>Download and upload the file here</li>
-                    </ol>
-                </div>
-                <!-- Messages -->
-                {% if messages %}
-                    <div class="space-y-2">
-                        {% for message in messages %}
-                            <div class="p-4 rounded-lg text-sm {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-900{% elif message.tags == 'success' %}bg-green-50 border border-green-200 text-green-900{% else %}bg-blue-50 border border-blue-200 text-blue-900{% endif %}">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                <!-- Submit -->
-                <div class="flex justify-end">
-                    <button type="submit"
-                            class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-lg font-semibold">
-                        Upload & Review
-                    </button>
-                </div>
-                <!-- Success message -->
-                {% if success %}
-                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-900">
-                        <p class="font-semibold mb-1">Success!</p>
-                        <p class="mb-2">Your file has been uploaded successfully.</p>
-                        <p class="mb-2">
-                            Please review the data and click <strong>Submit</strong> to save it.
-                        </p>
-                    </div>
-                {% endif %}
-                {% if error %}
-                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-900">
-                        <p class="font-semibold mb-1">Error!</p>
-                        <p class="mb-2">There was an error uploading your file.</p>
-                        <p class="mb-2">Please try again.</p>
-                    </div>
-                {% endif %}
-            </form>
+<div class="max-w-4xl mx-auto py-6 sm:py-8 space-y-6">
+
+    <!-- ================= PAGE HEADER ================= -->
+    <div class="border-b border-base-300 pb-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Import Publications from Web of Science</h1>
+                <p class="text-sm text-gray-600 mt-1">
+                    Upload and review bibliographic records exported in tab-delimited format from Clarivate Web of Science.
+                </p>
+            </div>
+            <div>
+                <a href="https://webofscience.help.clarivate.com/en-us/Content/export-records.htm"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition shadow-sm"
+                   title="Open official Clarivate documentation in a new tab">
+                    <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    <span>How to export records from Web of Science (Official Clarivate Guide)</span>
+                </a>
+            </div>
         </div>
     </div>
+
+    <!-- ================= DJANGO FLASH MESSAGES ================= -->
+    {% if messages %}
+        <div class="space-y-3" role="status" aria-live="polite">
+            {% for message in messages %}
+                <div class="flex items-start gap-3 p-4 rounded-xl text-sm border shadow-sm {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-900{% elif message.tags == 'success' %}bg-green-50 border-green-200 text-green-900{% elif message.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-900{% else %}bg-blue-50 border-blue-200 text-blue-900{% endif %}">
+                    <div class="shrink-0 mt-0.5">
+                        {% if message.tags == 'error' %}
+                            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        {% elif message.tags == 'success' %}
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                        {% else %}
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        {% endif %}
+                    </div>
+                    <div class="flex-1 leading-relaxed">
+                        {{ message }}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- ================= MAIN UPLOAD & WORKFLOW GRID ================= -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- UPLOAD CARD (2 Cols) -->
+        <div class="lg:col-span-2 bg-white border border-base-300 rounded-2xl shadow-sm p-6 sm:p-7"
+             x-data="wosUploadHandler()">
+            <h2 class="text-base font-semibold text-gray-900 mb-2">Upload Export File</h2>
+            <p class="text-xs text-gray-500 mb-5">
+                Select your exported tab-delimited text file (<code>.txt</code> or <code>.tsv</code>). Records will be parsed into an interactive review queue.
+            </p>
+
+            <form method="post"
+                  enctype="multipart/form-data"
+                  @submit="handleSubmit($event)"
+                  class="space-y-5">
+                {% csrf_token %}
+
+                <!-- CLIENT-SIDE VALIDATION WARNING -->
+                <div x-show="clientError"
+                     x-transition
+                     class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2.5"
+                     role="alert"
+                     style="display: none;">
+                    <svg class="w-4 h-4 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                        <p class="font-medium" x-text="clientError"></p>
+                        <p class="mt-1 text-red-700">Please re-export from Web of Science respecting the 5 MB / 500-record batch limit or select a valid .txt/.tsv file.</p>
+                    </div>
+                </div>
+
+                <!-- DRAG-AND-DROP FILE SELECTION BOX -->
+                <div class="relative">
+                    <label for="wos_file"
+                           class="block cursor-pointer border-2 border-dashed rounded-xl p-6 text-center transition-all duration-200"
+                           :class="[
+                               isDragOver ? 'border-blue-500 bg-blue-50/60' : 'border-gray-300 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-400',
+                               hasFile ? 'border-green-400 bg-green-50/30' : ''
+                           ]"
+                           @dragover.prevent="isDragOver = true"
+                           @dragleave.prevent="isDragOver = false"
+                           @drop.prevent="handleDrop($event)">
+
+                        <!-- Hidden authoritative input -->
+                        <input type="file"
+                               name="wos_file"
+                               id="wos_file"
+                               accept=".txt,.tsv"
+                               required
+                               class="sr-only"
+                               @change="handleFileSelect($event)"
+                               x-ref="fileInput">
+
+                        <!-- Icon State -->
+                        <div class="mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-3"
+                             :class="hasFile ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'">
+                            <template x-if="hasFile">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </template>
+                            <template x-if="!hasFile">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                            </template>
+                        </div>
+
+                        <!-- Text State (Unselected) -->
+                        <div x-show="!hasFile">
+                            <p class="text-sm font-semibold text-gray-800">
+                                Click to select file <span class="text-xs font-normal text-gray-500">or drag and drop</span>
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Web of Science export: <code>.txt</code> or <code>.tsv</code> (Tab-delimited)
+                            </p>
+                        </div>
+
+                        <!-- Text State (File Selected) -->
+                        <div x-show="hasFile" style="display: none;">
+                            <p class="text-sm font-semibold text-gray-900 break-all" x-text="fileName"></p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                File Size: <span class="font-medium text-gray-700" x-text="fileSize"></span>
+                            </p>
+                        </div>
+                    </label>
+
+                    <!-- Replace / Clear action when file selected -->
+                    <div x-show="hasFile"
+                         style="display: none;"
+                         class="flex justify-end mt-2">
+                        <button type="button"
+                                @click="clearFile()"
+                                class="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-800 font-medium py-1 px-2 rounded hover:bg-red-50 transition">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Remove / Choose different file</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- SPECIFICATIONS BADGE -->
+                <div class="flex flex-wrap items-center justify-between text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <span class="flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Format: <strong>.txt / .tsv</strong>
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16" />
+                        </svg>
+                        Max Size: <strong>{{ max_file_size_mb|default:"5" }} MB</strong>
+                    </span>
+                    <span class="flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                        Batch Limit: <strong>{{ max_records|default:"500" }} records</strong>
+                    </span>
+                </div>
+
+                <!-- SUBMIT BUTTON WITH LOADING STATE -->
+                <div class="flex items-center justify-between pt-2">
+                    <a href="{% url 'publications:list' %}"
+                       class="text-xs text-gray-600 hover:text-gray-900 font-medium transition py-2">
+                        ← Back to Catalog
+                    </a>
+
+                    <button type="submit"
+                            :disabled="isSubmitting"
+                            class="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-white bg-blue-700 hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition shadow-sm">
+                        <!-- Normal State -->
+                        <span x-show="!isSubmitting">Upload & Review Records →</span>
+                        <!-- Loading State -->
+                        <span x-show="isSubmitting" style="display: none;" class="inline-flex items-center gap-2">
+                            <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span>Uploading & Processing Records...</span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- EXPORT INSTRUCTIONS & TROUBLESHOOTING (1 Col) -->
+        <div class="bg-white border border-base-300 rounded-2xl shadow-sm p-6 sm:p-7 space-y-5">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">1</span>
+                    Export Checklist
+                </h3>
+                <p class="text-xs text-gray-500 mt-1">
+                    Follow these steps in Web of Science to generate a compatible file:
+                </p>
+            </div>
+
+            <ol class="space-y-3 text-xs text-gray-700">
+                <li class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-semibold text-[11px] shrink-0 mt-0.5">1</span>
+                    <div>
+                        <strong>Search & Select</strong>
+                        <p class="text-gray-500 mt-0.5">Run your query in Web of Science or open your Marked List.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-semibold text-[11px] shrink-0 mt-0.5">2</span>
+                    <div>
+                        <strong>Export Format</strong>
+                        <p class="text-gray-500 mt-0.5">Click <strong>Export</strong> and select <strong>Tab delimited file</strong> (or <em>Tab-delimited (Win)</em>). Do not select Excel (.xls) or BibTeX.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-semibold text-[11px] shrink-0 mt-0.5">3</span>
+                    <div>
+                        <strong>Record Content</strong>
+                        <p class="text-gray-500 mt-0.5">Choose <strong>Full Record</strong> (recommended) or <strong>Full Record and Cited References</strong>.</p>
+                    </div>
+                </li>
+                <li class="flex items-start gap-2.5">
+                    <span class="w-5 h-5 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center font-semibold text-[11px] shrink-0 mt-0.5">4</span>
+                    <div>
+                        <strong>Record Range</strong>
+                        <p class="text-gray-500 mt-0.5">Set record range to at most <strong>500 records</strong> per batch (e.g., Records 1 to 500) and click Export.</p>
+                    </div>
+                </li>
+            </ol>
+
+            <div class="border-t border-gray-200 pt-4">
+                <h4 class="text-xs font-semibold text-gray-800 mb-2">Troubleshooting & Limits</h4>
+                <ul class="space-y-1.5 text-xs text-gray-600">
+                    <li class="flex items-start gap-1.5">
+                        <span class="text-blue-600 font-bold">•</span>
+                        <span><strong>Oversized Files:</strong> If your export exceeds 5 MB or 500 records, split your export into smaller annual or departmental ranges (e.g. 1–500, 501–1000).</span>
+                    </li>
+                    <li class="flex items-start gap-1.5">
+                        <span class="text-blue-600 font-bold">•</span>
+                        <span><strong>Wrong Format:</strong> Files must contain standard WoS field tags (such as <code>TI</code>, <code>SO</code>, <code>AF</code>). CSV, Excel, PDF, or raw text files will be rejected.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="pt-2">
+                <a href="https://webofscience.help.clarivate.com/en-us/Content/export-records.htm"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition">
+                    <span>View Official Export Documentation</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function wosUploadHandler() {
+    return {
+        hasFile: false,
+        fileName: '',
+        fileSize: '',
+        isDragOver: false,
+        isSubmitting: false,
+        clientError: null,
+        maxBytes: {{ max_file_size_bytes|default:"5242880" }},
+
+        formatBytes(bytes) {
+            if (bytes < 1024) return bytes + ' bytes';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        },
+
+        validateFile(file) {
+            if (!file) return false;
+            const name = file.name.toLowerCase();
+            if (!name.endsWith('.txt') && !name.endsWith('.tsv')) {
+                this.clientError = "Invalid file extension. Please select a .txt or .tsv tab-delimited export file.";
+                this.clearFile();
+                return false;
+            }
+            if (file.size > this.maxBytes) {
+                const mb = (file.size / (1024 * 1024)).toFixed(2);
+                this.clientError = `Selected file (${mb} MB) exceeds the maximum allowed limit of 5 MB.`;
+                this.clearFile();
+                return false;
+            }
+            this.clientError = null;
+            this.hasFile = true;
+            this.fileName = file.name;
+            this.fileSize = this.formatBytes(file.size);
+            return true;
+        },
+
+        handleFileSelect(event) {
+            const files = event.target.files;
+            if (files && files.length > 0) {
+                this.validateFile(files[0]);
+            }
+        },
+
+        handleDrop(event) {
+            this.isDragOver = false;
+            const files = event.dataTransfer.files;
+            if (files && files.length > 0) {
+                if (this.$refs.fileInput) {
+                    this.$refs.fileInput.files = files;
+                }
+                this.validateFile(files[0]);
+            }
+        },
+
+        clearFile() {
+            this.hasFile = false;
+            this.fileName = '';
+            this.fileSize = '';
+            if (this.$refs.fileInput) {
+                this.$refs.fileInput.value = '';
+            }
+        },
+
+        handleSubmit(event) {
+            if (!this.hasFile && (!this.$refs.fileInput || !this.$refs.fileInput.files.length)) {
+                event.preventDefault();
+                this.clientError = "Please select a Web of Science export file to upload.";
+                return;
+            }
+            if (this.isSubmitting) {
+                event.preventDefault();
+                return;
+            }
+            this.isSubmitting = true;
+        }
+    };
+}
+</script>
 {% endblock %}

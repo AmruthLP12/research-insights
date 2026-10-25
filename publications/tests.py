@@ -923,3 +923,164 @@ class WoSUploadSecurityAndLimitsTestCase(TestCase):
             self.assertRedirects(response, reverse("publications:wos_upload"))
             self.assertNotIn("wos_records", self.client.session)
             self.assertContains(response, "Error processing Web of Science file")
+
+
+class WoSImportWorkflowAndUXTestCase(TestCase):
+    """
+    Test suite for Step 9: Web of Science import workflow, official guide link,
+    user guidance, loading/progress feedback, cancel workflow, and review UI.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="wos_staff", password="password123", role="user"
+        )
+        self.viewer = User.objects.create_user(
+            username="wos_viewer", password="password123", role="viewer"
+        )
+        self.client.force_login(self.user)
+
+    def test_upload_page_contains_verified_official_wos_documentation_link(self):
+        """Upload page must link to official Clarivate help with safe attributes."""
+        response = self.client.get(reverse("publications:wos_upload"))
+        self.assertEqual(response.status_code, 200)
+
+        official_url = "https://webofscience.help.clarivate.com/en-us/Content/export-records.htm"
+        self.assertContains(response, official_url)
+        self.assertContains(response, 'target="_blank"')
+        self.assertContains(response, 'rel="noopener noreferrer"')
+        self.assertContains(response, "How to export records from Web of Science")
+
+    def test_upload_page_displays_format_and_resource_limits(self):
+        """Upload page presents clear guidance on accepted formats and limits."""
+        response = self.client.get(reverse("publications:wos_upload"))
+        self.assertEqual(response.status_code, 200)
+
+        # Formats and limits
+        self.assertContains(response, ".txt")
+        self.assertContains(response, ".tsv")
+        self.assertContains(response, "5 MB")
+        self.assertContains(response, "500 records")
+        # Step checklist
+        self.assertContains(response, "Full Record")
+        self.assertContains(response, "Tab delimited")
+        # Loading and button markup
+        self.assertContains(response, "Uploading & Processing Records...")
+        self.assertContains(response, "Upload & Review Records")
+
+    def test_review_page_displays_batch_progress_and_context(self):
+        """Review page provides clear record counter, progress percentage, and last record status."""
+        session = self.client.session
+        session["wos_records"] = [
+            {"publication": {"title": "First Paper"}, "authors": []},
+            {"publication": {"title": "Second Paper"}, "authors": []},
+        ]
+        session["wos_index"] = 0
+        session.save()
+
+        # Reviewing record 1 of 2
+        resp = self.client.get(reverse("publications:wos_review"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context["index"], 1)
+        self.assertEqual(resp.context["total"], 2)
+        self.assertEqual(resp.context["progress_percent"], 50)
+        self.assertFalse(resp.context["is_last_record"])
+        self.assertEqual(resp.context["remaining_count"], 1)
+        self.assertContains(resp, "Record")
+        self.assertContains(resp, "1")
+        self.assertContains(resp, "2")
+        self.assertContains(resp, "Save & Next Record")
+
+        # Advance to record 2 of 2 (last record)
+        session["wos_index"] = 1
+        session.save()
+        resp2 = self.client.get(reverse("publications:wos_review"))
+        self.assertEqual(resp2.status_code, 200)
+        self.assertEqual(resp2.context["index"], 2)
+        self.assertEqual(resp2.context["total"], 2)
+        self.assertEqual(resp2.context["progress_percent"], 100)
+        self.assertTrue(resp2.context["is_last_record"])
+        self.assertEqual(resp2.context["remaining_count"], 0)
+        self.assertContains(resp2, "Final Record in Batch")
+        self.assertContains(resp2, "Save Final Publication & Finish Import")
+
+    def test_review_page_contains_cancel_action(self):
+        """Review page provides a safe way to cancel and discard the staged import."""
+        session = self.client.session
+        session["wos_records"] = [{"publication": {"title": "Staged Paper"}, "authors": []}]
+        session["wos_index"] = 0
+        session.save()
+
+        resp = self.client.get(reverse("publications:wos_review"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, reverse("publications:wos_cancel"))
+        self.assertContains(resp, "Discard Import Batch")
+
+    def test_wos_cancel_workflow_clears_session_and_redirects(self):
+        """Cancelling import clears session keys and informs the user."""
+        session = self.client.session
+        session["wos_records"] = [
+            {"publication": {"title": "Paper 1"}, "authors": []},
+            {"publication": {"title": "Paper 2"}, "authors": []},
+        ]
+        session["wos_index"] = 0
+        session.save()
+
+        resp = self.client.get(reverse("publications:wos_cancel"), follow=True)
+        self.assertRedirects(resp, reverse("publications:wos_upload"))
+        self.assertNotIn("wos_records", self.client.session)
+        self.assertNotIn("wos_index", self.client.session)
+        self.assertContains(resp, "Import cancelled")
+        self.assertContains(resp, "2 staged record(s) discarded")
+
+    def test_wos_cancel_access_control(self):
+        """Anonymous and viewer users cannot trigger wos_cancel."""
+        # Anonymous
+        self.client.logout()
+        resp_anon = self.client.get(reverse("publications:wos_cancel"))
+        self.assertEqual(resp_anon.status_code, 302)
+        self.assertIn("/accounts/login/", resp_anon.url)
+
+        # Viewer role
+        self.client.force_login(self.viewer)
+        resp_viewer = self.client.get(reverse("publications:wos_cancel"))
+        self.assertEqual(resp_viewer.status_code, 403)
+
+    def test_wos_save_validation_error_provides_actionable_field_feedback(self):
+        """When validation fails on wos_save, field-level error details are flashed in messages."""
+        session = self.client.session
+        session["wos_records"] = [
+            {"publication": {"title": "Incomplete"}, "authors": []}
+        ]
+        session["wos_index"] = 0
+        session.save()
+
+        # Missing required title and date_published
+        invalid_post = {
+            "title": "",
+            "document_type": "Journal Article",
+            "collaboration_type": "National",
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+        }
+        resp = self.client.post(reverse("publications:wos_save"), invalid_post, follow=True)
+        self.assertRedirects(resp, reverse("publications:wos_review"))
+        self.assertContains(resp, "Please correct the errors")
+        self.assertContains(resp, "Title")
+        self.assertContains(resp, "Date published")
+
+    def test_wos_success_page_displays_saved_count_and_action_links(self):
+        """Success page displays verified publication count and navigational links."""
+        session = self.client.session
+        session["wos_saved_count"] = 3
+        session.save()
+
+        resp = self.client.get(reverse("publications:wos_success"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Import Completed Successfully")
+        self.assertContains(resp, "3 publications")
+        self.assertContains(resp, reverse("publications:list"))
+        self.assertContains(resp, reverse("dashboard:home"))
+        self.assertContains(resp, reverse("publications:wos_upload"))

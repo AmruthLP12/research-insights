@@ -9,6 +9,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Ingestion Workflow & User Experience - 2026-10-25
+
+#### Step 9: Improve the Web of Science Import Workflow and User Experience
+- **Official Documentation Integration**:
+  - Embedded a verified official Clarivate Web of Science guide link (`https://webofscience.help.clarivate.com/en-us/Content/export-records.htm`) with safe external attributes (`target="_blank" rel="noopener noreferrer"`).
+  - Provided clear export guidance outlining required formats (Tab-delimited `.txt` or `.tsv`), record content (`Full Record` or `Full Record and Cited References`), and the 500-record / 5 MB limit.
+- **Upload Page Enhancements (`templates/publications/upload.html`)**:
+  - Replaced basic file input with a clean drag-and-drop file selector box powered by lightweight Alpine.js progressive enhancement.
+  - Added instant client-side file inspection showing selected filename and formatted size (`KB`/`MB`), with one-click file removal/replacement.
+  - Implemented client-side pre-validation checking file extensions and size limit before network transmission, while keeping authoritative server-side checks intact.
+  - Added honest submission loading feedback ("Uploading & Processing Records...") with a spinner icon and button disabling to prevent accidental duplicate uploads.
+  - Rendered a structured 4-step export checklist and troubleshooting advice for oversized/multi-year batches.
+- **Review Screen Workflow Improvements (`templates/publications/review.html`)**:
+  - Added step header and dynamic batch progress tracker ("Record X of Y", progress percentage bar, and "Final Record in Batch" status).
+  - Replaced unstyled `pub_form.as_p` with organized, semantic form sections (Core Metadata, Citations & Dates, Identifiers, Departments) with inline field-level error rendering.
+  - Improved author and affiliation review cards with author indexing, RRI role guidance, parsed affiliation lists, and author exclusion toggles.
+  - Differentiated intermediate records ("Save & Next Record") from the final record in the batch ("Save Final Publication & Finish Import").
+  - Added submission loading feedback on the save action to prevent duplicate persistence requests.
+  - Implemented an accessible cancel action allowing users to discard staged imports cleanly.
+- **Workflow Controllers & Routes (`publications/views.py` & `publications/urls.py`)**:
+  - Added `publications:wos_cancel` endpoint to discard staged session records cleanly with informational feedback.
+  - Enhanced `wos_review` view with batch context (`progress_percent`, `is_last_record`, `remaining_count`).
+  - Improved `wos_save` validation error formatting: summarizes specific field errors in user flash messages on redirect.
+  - Tracked and flashed verified publication count upon batch completion (`wos_saved_count`).
+- **Success Screen Enhancements (`templates/publications/wos_success.html`)**:
+  - Displayed verified saved publication count and clear summary of persisted entities.
+  - Added navigation pathways to view the publications catalog, visit the analytics dashboard, or import another batch.
+- **Regression Test Coverage (`publications/tests.py`)**:
+  - Added `WoSImportWorkflowAndUXTestCase` with 8 new tests (expanding `publications` tests from 40 to 48, total test suite to 87):
+    - `test_upload_page_contains_verified_official_wos_documentation_link`: Verifies official Clarivate help URL, safe link attributes, and text.
+    - `test_upload_page_displays_format_and_resource_limits`: Verifies format, 5 MB size limit, 500 record limit, and loading state markup.
+    - `test_review_page_displays_batch_progress_and_context`: Verifies record counter, progress percentage, last record status, and distinct button labels.
+    - `test_review_page_contains_cancel_action`: Verifies discard action is present.
+    - `test_wos_cancel_workflow_clears_session_and_redirects`: Verifies session cleanup and redirect to upload.
+    - `test_wos_cancel_access_control`: Verifies anonymous redirect and viewer 403 Forbidden enforcement on cancel.
+    - `test_wos_save_validation_error_provides_actionable_field_feedback`: Verifies field-level error messages in session flash on invalid submission.
+    - `test_wos_success_page_displays_saved_count_and_action_links`: Verifies saved publication count and catalog/dashboard/upload navigation links.
+- **Verification Results**:
+  - Entire test suite (87 tests across `accounts`, `dashboard`, `publications`) passes with 0 failures and 0 errors.
+  - `python manage.py check` reports 0 issues.
+  - `python manage.py makemigrations --check --dry-run` reports no schema drift.
+  - `git diff --check` reports no whitespace errors.
+- **Files Modified**:
+  - `templates/publications/upload.html`
+  - `templates/publications/review.html`
+  - `templates/publications/wos_success.html`
+  - `publications/views.py`
+  - `publications/urls.py`
+  - `publications/tests.py`
+  - `CHANGELOG.md`
+
 ### Ingestion Security & Validation - 2026-10-25
 
 #### Step 8: Harden Web of Science Upload Validation and Resource Limits
