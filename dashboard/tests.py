@@ -1,8 +1,10 @@
+import os
 from urllib.parse import quote
 from django.contrib.auth import get_user_model
-from django.test import TestCase, RequestFactory
+from django.test import TestCase, RequestFactory, override_settings
 from django.urls import reverse
 from django.template import Context, Template
+from django.template.loader import render_to_string
 from django.core.paginator import Paginator
 from publications.models import Department, Journal, Publication, Author
 from dashboard.templatetags.dashboard_tags import query_transform
@@ -475,3 +477,139 @@ class Batch1RoutingAndFunctionalDefectsTestCase(TestCase):
         resp_impact = self.client.get(reverse("dashboard:impact"))
         self.assertEqual(resp_impact.status_code, 200)
         self.assertNotContains(resp_impact, "/dashboard/impact/None/")
+
+
+@override_settings(DEBUG=False)
+class Batch2FoundationAndSharedUITestCase(TestCase):
+    def setUp(self):
+        self.viewer = User.objects.create_user(
+            username="b2_viewer", password="password123", role="viewer"
+        )
+        self.journal = Journal.objects.create(name="Physical Review Letters", impact_factor=9.1)
+
+    # --- TASK-P2-01: Base Template HTML Structure ---
+    def test_base_template_has_single_html_document_structure(self):
+        self.client.login(username="b2_viewer", password="password123")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        # Verify exactly one doctype, html, head, body, and closing tags
+        self.assertEqual(content.count("<!doctype html>"), 1)
+        self.assertEqual(content.count("<html"), 1)
+        self.assertEqual(content.count("</html>"), 1)
+        self.assertEqual(content.count("<head>"), 1)
+        self.assertEqual(content.count("</head>"), 1)
+        self.assertEqual(content.count("<body"), 1)
+        self.assertEqual(content.count("</body>"), 1)
+
+        # Verify essential scripts in head
+        self.assertIn("chart.min.js", content)
+        self.assertIn("chart-theme.js", content)
+        self.assertIn("alpine.min.js", content)
+        self.assertIn("lucide.min.js", content)
+
+    # --- TASK-P2-02: Authentication Layout Decoupled from Sidebar ---
+    def test_anonymous_login_page_does_not_contain_dashboard_sidebar(self):
+        response = self.client.get(reverse("accounts:login"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        # Verify sidebar element and dashboard navigation links are absent
+        self.assertNotIn("<aside", content)
+        self.assertNotIn('x-data="sidebarSetup()"', content)
+        self.assertNotIn(reverse("dashboard:home"), content)
+        self.assertNotIn(reverse("dashboard:trends"), content)
+
+        # Verify login form and CSRF token are present
+        self.assertContains(response, 'name="username"')
+        self.assertContains(response, 'name="password"')
+        self.assertContains(response, 'csrfmiddlewaretoken')
+        self.assertContains(response, 'Research Insights')
+
+    def test_anonymous_password_reset_pages_do_not_contain_sidebar(self):
+        reset_urls = [
+            reverse("accounts:password_reset"),
+            reverse("accounts:password_reset_done"),
+        ]
+        for url in reset_urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode("utf-8")
+            self.assertNotIn("<aside", content)
+            self.assertNotIn('x-data="sidebarSetup()"', content)
+            self.assertNotIn(reverse("dashboard:home"), content)
+
+    def test_authenticated_dashboard_still_displays_sidebar(self):
+        self.client.login(username="b2_viewer", password="password123")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("<aside", content)
+        self.assertIn("Research Dashboard", content)
+        self.assertIn('x-data="sidebarSetup()"', content)
+        self.assertIn(reverse("dashboard:home"), content)
+
+    # --- TASK-P2-03: Custom Error Templates ---
+    def test_custom_404_template_renders_cleanly(self):
+        response = self.client.get("/nonexistent-path-that-does-not-exist-404/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "404", status_code=404)
+        self.assertContains(response, "Page Not Found", status_code=404)
+        self.assertContains(response, reverse("publications:list"), status_code=404)
+        # Verify no sensitive stack trace or paths
+        self.assertNotContains(response, "Traceback", status_code=404)
+        self.assertNotContains(response, "Exception", status_code=404)
+
+    def test_custom_403_template_renders_cleanly(self):
+        rendered = render_to_string("403.html", {"user": self.viewer})
+        self.assertIn("403", rendered)
+        self.assertIn("Access Denied", rendered)
+        self.assertIn(reverse("publications:list"), rendered)
+        self.assertNotIn("Traceback", rendered)
+
+    def test_custom_500_template_renders_without_request_context(self):
+        rendered = render_to_string("500.html", {})
+        self.assertIn("500", rendered)
+        self.assertIn("Server Error", rendered)
+        self.assertIn(reverse("publications:list"), rendered)
+        self.assertNotIn("Traceback", rendered)
+
+    # --- TASK-P2-04: Filter Reset Behavior ---
+    def test_documents_filter_reset_link_uses_request_path_without_query_params(self):
+        self.client.login(username="b2_viewer", password="password123")
+        url = reverse("dashboard:documents") + "?document_type=Journal+Article&search=physics&page=2"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        # Must not use href="."
+        self.assertNotContains(response, 'href="."')
+        # Must point to /dashboard/documents/ without any query params
+        self.assertContains(response, f'href="{reverse("dashboard:documents")}"')
+
+    def test_authors_filter_reset_link_uses_request_path(self):
+        self.client.login(username="b2_viewer", password="password123")
+        url = reverse("dashboard:authors") + "?search=raman&total_publications_gt=5"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertNotContains(response, 'href="."')
+        self.assertContains(response, f'href="{reverse("dashboard:authors")}"')
+
+    # --- TASK-P2-05: Centralized Chart.js Visual Defaults ---
+    def test_chart_theme_static_asset_exists_and_defines_defaults(self):
+        theme_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "js", "chart-theme.js")
+        self.assertTrue(os.path.exists(theme_path), "static/js/chart-theme.js must exist")
+        with open(theme_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("palette", content)
+        self.assertIn("ChartTheme", content)
+        self.assertIn("applyDefaults", content)
+        self.assertIn("Inter", content)
+
+    def test_dashboard_templates_consume_chart_theme(self):
+        self.client.login(username="b2_viewer", password="password123")
+        response = self.client.get(reverse("dashboard:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "chart-theme.js")
+        self.assertContains(response, "ChartTheme.palette")

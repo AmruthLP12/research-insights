@@ -96,6 +96,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 labels: data.map(x => x.date_published__year),
                 datasets: [{
                     data: data.map(x => x.total),
+                    borderColor: window.ChartTheme ? ChartTheme.palette.primary : "#1E40AF",
+                    backgroundColor: window.ChartTheme ? "rgba(30, 64, 175, 0.1)" : "rgba(30, 64, 175, 0.1)",
                     borderWidth: 3,
                     tension: 0.3
                 }]

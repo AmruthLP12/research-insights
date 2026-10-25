@@ -96,7 +96,7 @@
 
                         data: documentCounts.map(x => x.total),
 
-                        backgroundColor: "#4f46e5",
+                        backgroundColor: window.ChartTheme ? ChartTheme.palette.primary : "#4f46e5",
 
                         borderRadius: 8,
 
@@ -140,9 +140,9 @@
 
                         data: yearStats.map(x => x.total),
 
-                        borderColor: "#06b6d4",
+                        borderColor: window.ChartTheme ? ChartTheme.palette.secondary : "#06b6d4",
 
-                        backgroundColor: "rgba(6,182,212,.2)",
+                        backgroundColor: window.ChartTheme ? "rgba(13, 148, 136, 0.15)" : "rgba(6,182,212,.2)",
 
                         fill: true,
 

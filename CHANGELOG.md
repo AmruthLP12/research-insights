@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Shared UI Foundation & Architecture - 2026-10-25
+
+#### Step 12: Foundation and Shared UI Fixes (Batch 2)
+- **Base Template HTML Document Structure Cleanup (`TASK-P2-01`)**:
+  - Removed duplicate `<!doctype html>`, `<html lang="en">`, and `</html>` structural wrapper tags from `dashboard/templates/base.html`.
+  - Structured `<head>` with proper script execution ordering, loading local `chart.min.js`, `chart-theme.js`, `alpine.min.js`, and `lucide.min.js`.
+  - Added extensible template blocks (`body_class`, `body_attrs`, `body`, `extra_head`, `extra_scripts`) while preserving child dashboard template blocks and flash alert handling.
+- **Decoupled Authentication Layout (`TASK-P2-02`)**:
+  - Created standalone authentication layout `templates/registration/base_auth.html` extending `base.html` and overriding `body` without rendering the dashboard sidebar, navigation links, or offset wrappers.
+  - Refactored `login.html`, `password_reset_form.html`, `password_reset_done.html`, `password_reset_confirm.html`, `password_reset_complete.html`, `password_change_form.html`, and `password_change_done.html` to extend `base_auth.html`.
+  - Unified authentication templates with institutional DaisyUI cards, preserving CSRF protection, form field rendering, validation error states, and responsive behavior.
+- **Custom Error Pages (`TASK-P2-03`)**:
+  - Added custom `templates/404.html` (Page Not Found) with navigation pathways to the publications catalog and dashboard/login.
+  - Added custom `templates/403.html` (Access Denied) for permission-denied scenarios.
+  - Added custom `templates/500.html` (Server Error) designed without dependencies on request contexts or context processors to guarantee reliable rendering during database or context-level failures.
+  - Verified no sensitive system paths, exception messages, or tracebacks are exposed.
+- **Filter Reset Query Preservation Fix (`TASK-P2-04`)**:
+  - Replaced ambiguous `href="."` relative links in `dashboard/templates/components/filter_bar.html` and `authors_filters.html` with explicit `href="{{ request.path }}"`.
+  - Ensured filter reset actions cleanly return to the base listing URL, clearing all active search, filtering, and pagination query parameters.
+- **Centralized Chart.js Defaults Helper (`TASK-P2-05`)**:
+  - Created `static/js/chart-theme.js` establishing global `Chart.defaults` (Inter font family, slate axis/tick colors, responsive flags, and coordinated tooltip styling).
+  - Exposed `window.ChartTheme` with institutional color palette and categorical color sequence (`palette`, `colors`, `getColor`, `getColors`).
+  - Refactored chart configurations in `dashboard.html`, `document_type_detail.html`, and `publications_list.html` to consume `ChartTheme.palette` safely without modifying calculations, labels, or dataset semantics.
+- **Regression Test Coverage & Verification**:
+  - Added 11 new tests in `dashboard/tests.py` (`Batch2FoundationAndSharedUITestCase`) verifying:
+    - Single HTML document structure in rendered output.
+    - Omission of dashboard sidebar on anonymous login and password-reset pages.
+    - Continued presence of sidebar on authenticated dashboard pages.
+    - Clean rendering and navigation pathways for 404, 403, and 500 templates.
+    - Filter reset link resolution without query parameters.
+    - Static asset integrity and runtime consumption of `chart-theme.js`.
+  - Full test suite expanded from 110 to 121 tests, all passing (0 failures, 0 errors in 138.0s).
+
+
 ### Core Functional & Routing Fixes - 2026-10-25
 
 #### Step 11: Fix Core Functional and Routing Defects (Batch 1)

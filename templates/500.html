@@ -1,0 +1,40 @@
+{% load static tailwind_tags %}
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Error (500) | Research Insights</title>
+    {% tailwind_css %}
+  </head>
+  <body class="bg-base-200 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md my-8">
+      <div class="text-center mb-6">
+        <a href="{% url 'publications:list' %}" class="inline-flex items-center gap-2 text-xl font-bold">
+          <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-neutral text-neutral-content font-bold text-lg">R</span>
+          <span>Research Insights</span>
+        </a>
+        <p class="text-xs text-base-content/60 mt-1">Raman Research Institute</p>
+      </div>
+
+      <div class="card bg-base-100 shadow-lg border border-base-300">
+        <div class="card-body text-center py-8">
+          <span class="text-5xl font-extrabold text-warning mb-2">500</span>
+          <h1 class="card-title text-xl justify-center mb-2">Server Error</h1>
+          <p class="text-base-content/70 text-sm mb-6">
+            An unexpected error occurred while processing your request. Please try again later or contact your system administrator.
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a href="{% url 'publications:list' %}" class="btn btn-primary">
+              Publications Catalog
+            </a>
+            <a href="{% url 'accounts:login' %}" class="btn btn-outline">
+              Sign In
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+

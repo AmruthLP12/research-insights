@@ -1,29 +1,26 @@
 {% load static tailwind_tags %}
-
 <!doctype html>
 <html lang="en" data-theme="light">
-  {% load static tailwind_tags %}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!doctype html>
-  <html lang="en" data-theme="light">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}RRI Publications Dashboard{% endblock %}</title>
 
-      <title>{% block title %}RRI Publications Dashboard{% endblock %}</title>
+    {% tailwind_css %}
 
-      {% tailwind_css %}
+    <script src="{% static 'js/chart.min.js' %}"></script>
+    <script src="{% static 'js/chart-theme.js' %}"></script>
+    <script src="{% static 'js/alpine.min.js' %}" defer></script>
+    <script src="{% static 'js/lucide.min.js' %}"></script>
+    {% block extra_head %}{% endblock %}
+  </head>
 
-      <script src="{% static 'js/chart.min.js' %}"></script>
-      <script src="{% static 'js/alpine.min.js' %}" defer></script>
-      <script src="{% static 'js/lucide.min.js' %}"></script>
-    </head>
-
-    <body
-      class="bg-base-200 min-h-screen"
-      x-data="sidebarSetup()"
-      x-init="init()"
-    >
+  <body
+    class="{% block body_class %}bg-base-200 min-h-screen{% endblock %}"
+    {% block body_attrs %}x-data="sidebarSetup()" x-init="init()"{% endblock %}
+  >
+    {% block body %}
       {% block sidebar %} {% include "dashboard/sidebar.html" %} {% endblock %}
 
       <!-- Main Content Wrapper: shifts right to make room for the FIXED sidebar -->
@@ -64,6 +61,15 @@
         </header>
 
         <main class="flex-1 overflow-y-auto p-4 sm:p-8">
+          {% if messages %}
+            <div class="space-y-2 mb-6">
+              {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-error{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+                  <span>{{ message }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
           {% block content %}{% endblock %}
         </main>
       </div>
@@ -78,11 +84,16 @@
               this.$watch("isCollapsed", (value) => {
                 localStorage.setItem("sidebarCollapsed", value);
               });
-              this.$nextTick(() => lucide.createIcons());
+              this.$nextTick(() => {
+                if (window.lucide && typeof lucide.createIcons === "function") {
+                  lucide.createIcons();
+                }
+              });
             },
           };
         }
       </script>
-    </body>
-  </html>
+    {% endblock %}
+    {% block extra_scripts %}{% endblock %}
+  </body>
 </html>
