@@ -3,3 +3,7 @@ venv
 db.sqlite3
 *.pyc
 staticfiles/
+
+__pycache__/
+*.py[cod]
+*$py.class
